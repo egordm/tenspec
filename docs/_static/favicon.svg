@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80">
+  <title>tenspec</title>
+  <rect width="80" height="80" rx="14" fill="#111619"/>
+  <g transform="translate(8 8)" fill="#e9eeeb">
+  <path d="M18 4h-8a8 8 0 0 0-8 8v40a8 8 0 0 0 8 8h8v-8h-8V12h8z"/>
+  <path d="M46 4h8a8 8 0 0 1 8 8v40a8 8 0 0 1-8 8h-8v-8h8V12h-8z"/>
+  <rect x="17" y="17" width="13" height="13" rx="1"/>
+  <rect x="34" y="17" width="13" height="13" rx="1"/>
+  <rect x="17" y="34" width="13" height="13" rx="1"/>
+  <rect x="34" y="34" width="13" height="13" rx="1"/>
+  </g>
+</svg>

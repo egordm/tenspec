@@ -1,0 +1,58 @@
+# tenspec: uv workspace root (virtual, not a package).
+# The single member lives under packages/tenspec; this root owns the shared lockfile + .venv,
+# so tenspec is a workspace MEMBER, not a standalone uv project. Per-package settings (deps,
+# extras) stay on the member so it remains self-contained.
+[tool.uv.workspace]
+members = ["packages/*"]
+
+[dependency-groups]
+# The normal development environment. `tenspec[dev]` brings ty; Pyright and Pyrefly join it
+# here, each pinned to the release it was measured against, because the integration test runs
+# all three and `poe check` runs that test. An ordinary `uv sync` therefore installs every
+# tool the one gate command needs. Pyright downloads its own Node on its first run.
+gate = [
+    "tenspec[dev]",
+    "pyright==1.1.411",
+    "pyrefly==1.2.0",
+]
+
+# The documentation site. `uv run --only-group docs` builds from this group alone, so the gate's
+# checkers and Torch stay out of the docs environment. It carries poethepoet itself, at the same
+# constraint the dev extra uses, because that command runs `poe` inside this group. The numpy
+# extra is here because autodoc imports the NumPy operation classes. The Torch entries in the
+# reference are written by hand.
+docs = [
+    "tenspec[numpy]",
+    "poethepoet>=0.30",
+    "sphinx>=8.1,<9",
+    "myst-nb>=1.2,<2",
+    "pydata-sphinx-theme>=0.16,<1",
+    "jupytext>=1.16,<2",
+    "ipykernel>=6.29,<7",
+]
+
+[tool.uv]
+default-groups = ["gate"]
+
+[tool.uv.sources]
+tenspec = { workspace = true }
+
+# ---------------------------------------------------------------------------------------------
+# Single workspace type config: ty is discovered here (the member carries no `[tool.ty]` of its
+# own), so the rules are defined ONCE. ruff (lint + format) lives in ruff.toml; poe tasks in
+# poe_tasks.toml.
+# ---------------------------------------------------------------------------------------------
+[tool.ty.environment]
+python-version = "3.13"
+
+[tool.pytest.ini_options]
+# One pytest run over the member's tests, the integration tests included. Those start three
+# checker processes, and nothing here deselects them. `importlib` import mode avoids needing
+# __init__.py in tests/ trees.
+testpaths = ["packages"]
+addopts = "-ra --strict-markers --strict-config --import-mode=importlib"
+filterwarnings = ["error"]
+
+# poe tasks are defined in poe_tasks.toml (the verbose `[tool.poe.tasks.*]` form), included here.
+[tool.poe]
+include = ["poe_tasks.toml"]

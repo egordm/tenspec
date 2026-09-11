@@ -1,0 +1,14 @@
+# Pre-commit hooks for this repo.
+# Activate once per clone: uv run pre-commit install
+
+repos:
+  # Standard hygiene; all auto-fix or fail only on real problems.
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-merge-conflict
+      - id: check-toml
+      - id: check-added-large-files
+        args: [--maxkb=500]

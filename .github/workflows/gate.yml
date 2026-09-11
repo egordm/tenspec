@@ -1,0 +1,33 @@
+# The commit/CI gate: lint + format + typecheck + the full test suite (`poe check-full`). This
+# template leaves GitHub Actions off by convention: pre-commit is the live, enforced gate on
+# every commit. This workflow stays small and standard as an optional CI backstop, for a project
+# that wants one on top of pre-commit.
+name: gate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  gate:
+    name: poe check-full (lint + type + test)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: Sync the gate env
+        # --frozen needs a committed uv.lock; `uv sync` writes it locally, commit it once.
+        run: uv sync --frozen
+
+      - name: Run the full gate
+        run: uv run --no-sync poe check-full

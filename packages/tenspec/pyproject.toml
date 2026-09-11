@@ -1,0 +1,61 @@
+[project]
+name = "tenspec"
+version = "0.1.0"
+description = "Tensor specifications that a function, a model, or a direct call checks at its boundary."
+readme = "README.md"
+requires-python = ">=3.13"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Egor Dmitriev" }]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Typing :: Typed",
+]
+dependencies = [
+    "pydantic>=2.13.4,<3",
+    "typing-extensions>=4.13",
+]
+
+[project.urls]
+Source = "https://github.com/egordm/tenspec"
+Documentation = "https://egordm.github.io/tenspec/"
+Issues = "https://github.com/egordm/tenspec/issues"
+
+[project.optional-dependencies]
+# One extra per array backend. The common tenspec import loads neither library.
+#
+# One floor per Python release. Each one is the oldest release tested on the interpreter it
+# applies to: numpy 2.1 and torch 2.6 on Python 3.13, and numpy 2.3.2 and torch 2.9 on 3.14.
+numpy = [
+    "numpy>=2.1; python_version < '3.14'",
+    "numpy>=2.3.2; python_version >= '3.14'",
+]
+torch = [
+    "torch>=2.6; python_version < '3.14'",
+    "torch>=2.9; python_version >= '3.14'",
+]
+dev = [
+    "tenspec[numpy,torch]",
+    "pytest>=8.0",
+    "ruff>=0.8",
+    "ty>=0.0.78",
+    "poethepoet>=0.30",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/tenspec"]
+
+[tool.hatch.build.targets.sdist]
+# README.md joins the list because `readme` names it: a source archive must be able to rebuild
+# its own metadata.
+include = ["src", "tests", "examples", "pyproject.toml", "README.md"]
+
+# ruff + ty + pytest + poe are configured ONCE at the workspace root (../../pyproject.toml,
+# ruff.toml, poe_tasks.toml): this member carries none of its own.

@@ -1,0 +1,87 @@
+/* The Tenspec palette, set through the PyData theme's own color variables.
+ *
+ * `--pst-color-secondary` is the color the theme gives the Back to top action, which is the
+ * only non-semantic action button on the site. Warning, error and syntax colors are left alone.
+ */
+
+html[data-theme="dark"] {
+  --pst-color-background: #111619;
+  --pst-color-on-background: #1a2326;
+  --pst-color-surface: #1a2326;
+  --pst-color-on-surface: #e9eeeb;
+  --pst-color-text-base: #e9eeeb;
+  --pst-color-heading-color: #e9eeeb;
+  --pst-color-primary: #78d8c7;
+  --pst-color-link: #78d8c7;
+  --pst-color-link-hover: #78d8c7;
+  --pst-color-accent: #78d8c7;
+  --pst-color-inline-code: #e9eeeb;
+  --pst-color-secondary: #78d8c7;
+  --pst-color-secondary-text: #111619;
+}
+
+html[data-theme="light"] {
+  --pst-color-background: #fbfcfa;
+  --pst-color-text-base: #182326;
+  --pst-color-heading-color: #182326;
+  --pst-color-primary: #146f65;
+  --pst-color-link: #146f65;
+  --pst-color-link-hover: #146f65;
+  --pst-color-accent: #146f65;
+  --pst-color-secondary: #146f65;
+  --pst-color-secondary-text: #fbfcfa;
+}
+
+/* The header. The theme variable owns the height, and the mark keeps a proportionate box. The
+ * SVG geometry is unchanged.
+ *
+ * The theme's `.bd-header .bd-header__inner` carries `padding: .5rem 1rem`, which adds 8 pixels
+ * above and below the brand box. That padding, not the height variable, is what made the
+ * rendered header 72 pixels. The override repeats both classes, because a single class loses to
+ * that rule. The horizontal padding stays.
+ */
+html {
+  --pst-header-height: 3.5rem;
+}
+
+.bd-header .bd-header__inner {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.navbar-brand img {
+  height: 30px;
+  width: auto;
+}
+
+.navbar-brand .title {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* No hover underline on the brand or on an icon control, including the mobile menu. Ordinary
+ * text links keep theirs, and every control keeps its focus outline.
+ */
+.navbar-brand:hover,
+.navbar-brand:hover .title,
+.navbar-icon-links a:hover,
+.bd-header button:hover {
+  text-decoration: none;
+}
+
+/* Keep the touch target usable where the header is now shorter. */
+.navbar-icon-links a {
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+}
+
+/* Put the desktop controls on the right, with the logo on the left.
+ *
+ * `.navbar-header-items` grows to fill the row, and the end group is its only child here, so
+ * that group starts where the logo ends. The theme's `navbar_align` option moves the center
+ * element, which this header omits, so the margin does the work instead. The theme hides this
+ * group below 960 pixels, so the mobile header keeps its own layout.
+ */
+.bd-header .navbar-header-items__end {
+  margin-left: auto;
+}

@@ -1,0 +1,53 @@
+# poe tasks for the whole workspace (included from pyproject `[tool.poe] include`). Every tool
+# runs once over all members against the single shared config, never one package at a time.
+# The documentation tutorials are Python sources too, so they take the same three tools.
+
+[tool.poe.tasks.lint]
+help = "Lint all packages with ruff"
+cmd = "ruff check packages docs"
+
+[tool.poe.tasks.lint-fix]
+help = "Lint all packages and apply ruff's safe fixes"
+cmd = "ruff check --fix packages docs"
+
+[tool.poe.tasks.format]
+help = "Format all packages with ruff"
+cmd = "ruff format packages docs"
+
+[tool.poe.tasks.format-check]
+help = "Check formatting across all packages without writing"
+cmd = "ruff format --check packages docs"
+
+[tool.poe.tasks.typecheck]
+help = "Type-check all packages with ty"
+cmd = "ty check packages docs"
+
+[tool.poe.tasks.test]
+help = "Run the test suite, the caller-compatibility integration tests included"
+cmd = "pytest"
+
+# `check` and `check-full` are identical for a single-package project; `check-full` is the name that
+# grows the slower integration tests as the project adds them, mirroring the fast-vs-commit gate
+# split of a larger workspace. Both run the whole suite, so both read the caller fixture with ty,
+# Pyright and Pyrefly. There is no separate checker command and no separate environment.
+[tool.poe.tasks.check]
+help = "Fast iteration gate: lint, format-check, typecheck, test. Run freely while building."
+sequence = ["lint", "format-check", "typecheck", "test"]
+default_item_type = "ref"
+
+[tool.poe.tasks.check-full]
+help = "Commit + CI gate: same as check for a single-package project; add integration tests as they land."
+sequence = ["lint", "format-check", "typecheck", "test"]
+default_item_type = "ref"
+
+# The documentation site. Run it as `uv run --only-group docs poe docs`: that group alone holds
+# the build, so the checkers and Torch stay out of it. `-W` turns every Sphinx warning into an
+# error, so a broken link or a missing reference fails the build instead of shipping. The output
+# stays under the gitignored artifacts/ tree.
+[tool.poe.tasks.docs]
+help = "Build the documentation site into artifacts/docs/html"
+# The default uv executor starts a second `uv run` of its own, which selects the environment
+# again and loses the caller's `--only-group docs`. The simple executor runs the command in the
+# environment the caller already chose. This applies to this task alone.
+executor = "simple"
+cmd = "sphinx-build -b html -W --keep-going docs artifacts/docs/html"

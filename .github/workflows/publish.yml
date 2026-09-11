@@ -1,0 +1,103 @@
+# Publish a release's distributions to PyPI, with GitHub OIDC Trusted Publishing.
+#
+# PyPI binds the publisher to this owner, this repository, this workflow filename and the `pypi`
+# environment. No PyPI token is stored anywhere, and this workflow reads no secret.
+name: publish
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build the distributions
+    # The public repository and a v-prefixed tag only. The private archive, and a release cut
+    # from any other ref, builds nothing.
+    if: >-
+      github.repository == 'egordm/tenspec' &&
+      github.event.repository.visibility == 'public' &&
+      startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout the release commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The commit the release event carries. Resolving the tag name again would follow the
+          # tag if someone moved it after the event.
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Check the tag against the package version
+        # The tag arrives as an environment value. Interpolated into the script text it would
+        # be event-controlled shell code. `tomllib` reads the declared version, so no quoting
+        # style or line format can mislead the comparison. The runner's own Python 3 carries it.
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          python3 - <<'PY'
+          import os
+          import sys
+          import tomllib
+          from pathlib import Path
+
+          manifest = tomllib.loads(Path("packages/tenspec/pyproject.toml").read_text())
+          version = manifest.get("project", {}).get("version")
+          if not version:
+              sys.exit("packages/tenspec/pyproject.toml declares no project.version")
+
+          tag = os.environ["RELEASE_TAG"]
+          if tag != f"v{version}":
+              sys.exit(f"the release tag {tag} does not name version {version}")
+
+          print(f"the release tag {tag} names version {version}")
+          PY
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+
+      - name: Build the wheel and the source archive
+        run: uv build packages/tenspec --out-dir dist
+
+      - name: Upload the distributions
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: tenspec-distributions
+          path: dist/*
+          if-no-files-found: error
+
+  publish:
+    name: Publish to PyPI
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment:
+      name: pypi
+      url: https://pypi.org/p/tenspec
+    # The OIDC permission lives on this job alone, and a job permission block replaces the
+    # workflow block rather than adding to it. This job checks out no source, runs no package
+    # code, builds no file and reads no secret.
+    permissions:
+      id-token: write
+
+    steps:
+      - name: Download the distributions
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: tenspec-distributions
+          path: dist
+
+      - name: Publish
+        # The action exchanges the job's OIDC token for a short-lived upload credential. Both
+        # the metadata check and the PEP 740 attestations stay on.
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+        with:
+          packages-dir: dist
+          verify-metadata: true
+          attestations: true

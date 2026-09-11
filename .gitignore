@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+build/
+dist/
+
+# Env + tool caches
+.venv/
+.env
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Editor state
+.vscode/
+.idea/
+.DS_Store
+
+# Retained release evidence (visible, never committed)
+artifacts/

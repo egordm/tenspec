@@ -1,0 +1,75 @@
+# Single workspace ruff config (lint + format) for the member. The member carries no ruff config
+# of its own, so the rules are defined ONCE here. (ty lives in pyproject `[tool.ty]`, pytest in
+# pyproject `[tool.pytest.ini_options]`.)
+line-length = 100
+target-version = "py313"
+src = ["packages/*/src", "packages/*/tests"]
+
+[lint]
+# DOC201/DOC402/DOC501 (pydoclint: Returns/Yields/Raises go in Google sections, not buried in
+# prose) are preview rules. `preview` enables the preview engine; `explicit-preview-rules` gates
+# it so ONLY the preview codes named below activate (not the whole preview surface via `ALL`).
+# DOC502 (over-documented Raises) is deliberately NOT selected: it false-positives on an exception
+# a callee raises and the docstring honestly surfaces.
+preview = true
+explicit-preview-rules = true
+select = ["ALL", "DOC201", "DOC402", "DOC501"]
+ignore = [
+    # --- docstrings: presence + summary-shape off, Google STYLE on (D209/D403/... still apply) ---
+    "D1",       # pydocstyle PRESENCE (missing-docstring): write docstrings where they earn it.
+    "D205",     # blank-after-summary + first-line-ends-with-period: dense, multi-line technical
+    "D400",     #   prose wraps past one physical line. A one-line summary would blow the 100-char
+    "D415",     #   limit (we keep E501) or force risky rewording.
+    # --- formatter-owned / verbosity, off by long-standing convention ---
+    "ANN401",   # allow `Any` where unavoidable.
+    "COM812",   # trailing comma: the formatter handles it.
+    "ISC001",   # implicit string concat: the formatter handles it.
+    "EM",       # exception message in a string literal: verbose.
+    "TRY003",   # long exception messages.
+    "TC",       # TYPE_CHECKING moves: pydantic resolves annotations at runtime; keep model types.
+    "CPY001",   # missing-copyright-notice: left preview in ruff 0.16.6 and turns the template
+    #             red out of the box. One LICENSE file carries the licence for the distribution.
+    "PLR2004",  # magic-value-comparison: false-positive heavy for domain bounds, shape dims, and
+    #             definitional thresholds. Co-location of the value with its owner (python-style)
+    #             plus review catch a genuinely-unexplained number better than a blanket flag.
+]
+
+[lint.flake8-tidy-imports.banned-api]
+# Config comes from a pydantic-settings object, never an ad-hoc env read. The legitimate exception
+# (writing the process env to hand vars to a child process) takes a narrow `# noqa: TID251` with a
+# reason.
+"os.getenv".msg = "read config from a settings object (pydantic-settings), not os.getenv."
+"os.environ".msg = "read config from a settings object; for a deliberate process-env write, noqa TID251."
+
+[lint.pydocstyle]
+convention = "google"
+
+[lint.isort]
+known-first-party = ["tenspec"]
+
+[lint.per-file-ignores]
+# The Sphinx configuration: Sphinx executes this file and reads its module-level names, so it
+# is never imported as part of a package (INP001).
+"docs/conf.py" = ["INP001"]
+# The documentation tutorials, in Jupytext percent format. A teaching page prints its results
+# (T201) and sits outside any package (INP001). The Jupytext header is YAML metadata in a
+# comment block, which reads as commented-out code (ERA001). The notebook builder runs them.
+"docs/examples/**" = ["INP001", "T201", "ERA001"]
+# Examples: a runnable program prints its results (T201), sits outside any package
+# (INP001), and shows caller code whose docstrings stay one line (DOC201).
+"**/examples/**" = ["INP001", "T201", "DOC201"]
+# Benchmarks: a measurement program prints its results and sits outside any package.
+"**/benchmarks/**" = ["INP001", "T201", "DOC201"]
+
+# Tests: a non-package dir (INP001); asserts (S101); patch the env (TID251); run subprocesses
+# (S404/S603); many-kwarg factories (PLR0913); exercise internal seams (SLF001); one-line
+# fixture/helper docstrings need no Returns/Raises section (DOC2xx). ANN stays ON (tests are
+# typed). (PLR2004 is off globally.)
+"**/tests/**" = [
+    "INP001", "S101", "TID251", "S404", "S603", "PLR0913", "SLF001",
+    "DOC201", "DOC402", "DOC501",
+]
+
+[format]
+quote-style = "double"
+docstring-code-format = true

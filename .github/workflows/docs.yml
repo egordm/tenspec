@@ -1,0 +1,75 @@
+# Build the documentation site and publish it to GitHub Pages.
+name: docs
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# One Pages deployment at a time. A queued run waits for the active one to finish rather than
+# cancelling it, so a run that is already deploying completes.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build the site
+    # Public repository, and the main branch only. `workflow_dispatch` can name any ref, so the
+    # ref condition is checked here rather than left to the push trigger.
+    if: >-
+      github.repository == 'egordm/tenspec' &&
+      github.event.repository.visibility == 'public' &&
+      github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Build the site
+        # The same command a maintainer runs locally, so the two cannot drift.
+        run: uv run --only-group docs poe docs
+
+      - name: Upload the Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: artifacts/docs/html
+
+  deploy:
+    name: Deploy to Pages
+    needs: build
+    if: >-
+      github.repository == 'egordm/tenspec' &&
+      github.event.repository.visibility == 'public' &&
+      github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    # Only this job writes. `id-token` lets the Pages deployment prove which workflow produced
+    # the artifact.
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
