@@ -1,6 +1,6 @@
 [project]
 name = "tenspec"
-version = "0.1.0"
+version = "0.2.0"
 description = "Tensor specifications that a function, a model, or a direct call checks at its boundary."
 readme = "README.md"
 requires-python = ">=3.13"
