@@ -7,7 +7,7 @@ reader and a type checker both see them. It accepts or refuses the array the cal
 converts nothing, moves nothing, and copies nothing, unless the declaration names a transform
 that copies.
 
-This is an early release, at version 0.1.0. The interface can change before version 1.0.
+This is an early release, at version 0.2.0. The interface can change before version 1.0.
 
 ## Install
 

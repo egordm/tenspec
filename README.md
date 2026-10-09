@@ -21,7 +21,7 @@ pip install "tenspec[numpy]"   # or: uv add "tenspec[numpy]"
 Name the array library you need as an extra: `numpy` or `torch`. `import tenspec` loads neither
 one.
 
-This is an early release, at version 0.1.0, and the interface can change before version 1.0. It
+This is an early release, at version 0.2.0, and the interface can change before version 1.0. It
 needs Python 3.13 or newer. The tested interpreter and array-library combinations are in
 [the support matrix](docs/type-checkers.md#the-measured-support-matrix).
 
@@ -36,6 +36,9 @@ one model validation, beside your own validators and your own configuration.
 
 **Runtime checks are opt in.** An annotation alone performs no runtime work. A declaration
 checks a value only where `@checked`, `TensorContracts` or `validate` prepares it.
+
+**Array alternatives.** A union can accept a NumPy array or Torch tensor at one boundary.
+Only the alternative Pydantic selects contributes bindings to later operands.
 
 **Transforms are explicit and structure-preserving.** A declaration changes a value only when it
 names a transform. The runtime verifies that the result kept its class, shape, native dtype and
