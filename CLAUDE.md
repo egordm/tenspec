@@ -51,6 +51,9 @@ integration, and nothing outside `numpy.py` and `torch.py` imports an array libr
   hashes its argument, and a caller may write a class that has no usable hash.
 - **A refused array commits no binding.** `validate_array` proposes its facts and commits
   them through the public bind operations only after the whole check passes.
+- **Only a selected union arm commits bindings.** Each tensor-bearing alternative checks
+  with copied facts. It retains its accepted value and facts until Pydantic selects an arm;
+  the union then merges that candidate's facts and returns its native value.
 - **An unsupported declaration raises AnnotationError.** It never falls back to a check of
   the base array type alone. `TensorDeclaration.__get_pydantic_core_schema__` is that guard.
   The carrier sits in `runtime/arrays.py` so a backend module never imports the resolver.

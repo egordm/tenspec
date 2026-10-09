@@ -8,9 +8,25 @@ import pytest
 
 from pydantic import ValidationError
 from tenspec import axis_size, checked
-from tenspec.errors import BindingError, BindingReason
+from tenspec.errors import BindingError, BindingReason, TensorMismatch
 from tenspec.numpy import Float
 from tenspec.runtime.bindings import Bindings, validation_scope
+
+
+def test_merge_atomic_when_candidate_disagrees_with_existing_fact() -> None:
+    # Arrange
+    bindings = Bindings()
+    bindings.bind_dimension("rows", 2)
+    candidate = Bindings()
+    candidate.bind_dimension("new", 9)
+    candidate.bind_dimension("rows", 3)
+
+    # Act and Assert
+    with pytest.raises(TensorMismatch, match="rows=2"):
+        bindings.merge(candidate)
+
+    # Assert
+    assert dict(bindings.dimensions) == {"rows": 2}
 
 
 def test_lookup_fails_when_no_scope() -> None:

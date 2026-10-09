@@ -16,16 +16,18 @@ from typing import (
     get_origin,
 )
 
+from pydantic.fields import FieldInfo
+from pydantic_core.core_schema import ValidatorFunctionWrapHandler
 from typing_extensions import TypeForm
 
-from pydantic import AfterValidator, Field
+from pydantic import AfterValidator, Field, WrapValidator
 from tenspec.errors import AnnotationError
 from tenspec.runtime.arrays import (
     TensorDeclaration,
     effective_formats,
     refuse_device,
 )
-from tenspec.runtime.bindings import active_bindings
+from tenspec.runtime.bindings import Bindings, active_bindings, validation_scope
 from tenspec.runtime.validation import ArrayValidator
 from tenspec.types import operations
 from tenspec.types.dtypes import DType, DTypeRequirement
@@ -53,6 +55,39 @@ class TensorCheck:
             transforms returned.
         """
         return self.validator.validate(value, bindings=active_bindings())
+
+
+@dataclass(frozen=True, eq=False, slots=True)
+class UnionCandidate:
+    """An accepted arm's value and facts, pending Pydantic's selection."""
+
+    value: Any
+    bindings: Bindings
+
+
+def validate_union_arm(value: Any, handler: ValidatorFunctionWrapHandler) -> UnionCandidate:
+    """Validate an alternative without changing its enclosing scope.
+
+    Returns:
+        The accepted value and its isolated binding facts.
+    """
+    child = active_bindings().fork()
+    with validation_scope(bindings=child):
+        result = handler(value)
+    return UnionCandidate(value=result, bindings=child)
+
+
+def commit_union_candidate(candidate: UnionCandidate) -> Any:
+    """Commit the selected arm's facts and return its native value.
+
+    Returns:
+        The value selected by Pydantic.
+
+    Raises:
+        TensorMismatch: when the selected facts disagree with the enclosing scope.
+    """
+    active_bindings().merge(candidate.bindings)
+    return candidate.value
 
 
 def declaration_of(alias: TypeAliasType) -> TensorDeclaration | None:
@@ -135,7 +170,25 @@ def prepare_annotation[T](
     metadata = getattr(annotation, "__metadata__", None)
     if metadata is not None:
         inner: Any = prepare_annotation(wrapped.__origin__, entered=entered)
-        return cast("TypeForm[T]", Annotated[(inner, *metadata)])
+        selected = getattr(inner, "__metadata__", ())
+        if (
+            selected
+            and isinstance(selected[-1], AfterValidator)
+            and selected[-1].func is commit_union_candidate
+        ):
+            configuration: list[Any] = []
+            callbacks: list[Any] = []
+            for item in metadata:
+                settings = item.metadata if isinstance(item, FieldInfo) else (item,)
+                target = (
+                    configuration
+                    if any(getattr(setting, "union_mode", None) is not None for setting in settings)
+                    else callbacks
+                )
+                target.append(item)
+            inner = Annotated[(inner.__origin__, *selected[:-1], *configuration, selected[-1])]
+            metadata = tuple(callbacks)
+        return cast("TypeForm[T]", Annotated[(inner, *metadata)] if metadata else inner)
     origin = get_origin(annotation)
     if origin is UnionType or origin is Union:
         return cast("TypeForm[T]", prepare_union(get_args(annotation), entered=entered))
@@ -177,29 +230,31 @@ def prepare_named_alias(alias: TypeAliasType, entered: frozenset[Any]) -> Any:
 
 
 def prepare_union(arms: tuple[Any, ...], *, entered: frozenset[Any] = frozenset()) -> Any:
-    """Resolve a union that holds at most one tensor arm beside None.
+    """Prepare tensor alternatives with bindings committed only after selection.
 
-    An optional tensor is supported. A union of alternative tensor structures is not,
-    because a refused arm can leave a binding behind that a later operand then matches.
-    An arm that names a caller's own alias counts as the declaration that alias holds.
+    Ordinary unions and the single optional tensor retain their existing schemas.
+    Alternative tensor arms retain independent facts until Pydantic selects one.
 
     Returns:
         The union with every arm prepared.
 
     Raises:
-        AnnotationError: for a union of alternative tensor structures.
+        AnnotationError: when tensor alternatives are mixed with ordinary types.
     """
     classified = [(arm, carries_declaration(arm, entered=entered)) for arm in arms]
     tensor_arms = [arm for arm, carries in classified if carries]
     others = [arm for arm, carries in classified if not carries]
-    if tensor_arms and not (len(tensor_arms) == 1 and all(arm is NoneType for arm in others)):
+    if tensor_arms and any(arm is not NoneType for arm in others):
         raise AnnotationError(
-            "a union of alternative tensor structures is not supported. Write one tensor "
-            "declaration, and add None for an optional tensor."
+            "a tensor union takes tensor-bearing alternatives and optional None, "
+            "not ordinary non-tensor alternatives"
         )
-    return functools.reduce(
-        operator.or_, [prepare_annotation(arm, entered=entered) for arm in arms]
-    )
+    prepared: list[Any] = [prepare_annotation(arm, entered=entered) for arm in arms]
+    if len(tensor_arms) <= 1:
+        return functools.reduce(operator.or_, prepared)
+    candidates = [Annotated[arm, WrapValidator(validate_union_arm)] for arm in prepared]
+    union = functools.reduce(operator.or_, candidates)
+    return Annotated[union, AfterValidator(commit_union_candidate)]
 
 
 def prepare_alias(alias: TypeAliasType, supplied: tuple[Any, ...]) -> Any:

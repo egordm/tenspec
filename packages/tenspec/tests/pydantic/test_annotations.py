@@ -136,25 +136,36 @@ def test_optional_array_rejected_when_shapes_differ() -> None:
         batch_size(values, np.zeros((5, 3), dtype=np.float32))
 
 
-def test_union_rejected_when_tensor_alternatives_present() -> None:
-    # Act and Assert
-    with pytest.raises(AnnotationError, match="alternative tensor structures"):
-        validate(
-            (np.ones(2), "second"),
-            tuple[Float[Shape["rows"]], Shape["first"]]
-            | tuple[Float[Shape["cols"]], Shape["second"]],
-        )
+def test_union_accepted_when_second_tensor_alternative_matches() -> None:
+    # Arrange
+    values = np.ones(2)
+
+    # Act
+    result = validate(
+        (values, "second"),
+        tuple[Float[Shape["rows"]], Shape["first"]] | tuple[Float[Shape["cols"]], Shape["second"]],
+    )
+
+    # Assert
+    assert result[0] is values
+    assert result[1] == "second"
 
 
-def test_union_rejected_when_wrapper_contains_alternatives() -> None:
+def test_union_accepted_when_wrapper_prepares_array() -> None:
+    # Act
+    result = validate(
+        [1.0, 2.0],
+        Annotated[Float[Shape["rows"]] | Float[Shape["cols"], Finite], BeforeValidator(np.asarray)],
+    )
+
+    # Assert
+    np.testing.assert_array_equal(result, [1.0, 2.0])
+
+
+def test_union_rejected_when_tensor_mixed_with_ordinary_type() -> None:
     # Act and Assert
-    with pytest.raises(AnnotationError, match="alternative tensor structures"):
-        validate(
-            np.ones(2),
-            Annotated[
-                Float[Shape["rows"]] | Float[Shape["cols"], Finite], BeforeValidator(np.asarray)
-            ],
-        )
+    with pytest.raises(AnnotationError, match="ordinary non-tensor"):
+        validate(np.ones(2), Float[Shape["rows"]] | int)
 
 
 def test_union_accepted_when_no_tensor_declared() -> None:

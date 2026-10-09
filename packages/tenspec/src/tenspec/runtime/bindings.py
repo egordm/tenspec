@@ -4,7 +4,7 @@ from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from contextvars import ContextVar
 from types import MappingProxyType
-from typing import TypeVar
+from typing import Self, TypeVar
 
 from tenspec.errors import BindingError, BindingReason, TensorMismatch
 from tenspec.types.dtypes import DTypeId
@@ -40,6 +40,35 @@ class Bindings:
     def devices(self) -> Mapping[TypeVar, DeviceId]:
         """The committed placement of every bound device variable."""
         return MappingProxyType(self.committed_devices)
+
+    def fork(self) -> Self:
+        """Copy known facts for a validation attempt that may be discarded.
+
+        Returns:
+            Independent bindings with the same dimension, dtype and device facts.
+        """
+        child = type(self)()
+        child.committed_dimensions.update(self.dimensions)
+        child.committed_dtypes.update(self.dtypes)
+        child.committed_devices.update(self.devices)
+        return child
+
+    def merge(self, candidate: Self) -> None:
+        """Commit accepted facts after checking their agreement with this scope.
+
+        Raises:
+            TensorMismatch: when any candidate fact disagrees. No fact commits.
+        """
+        merged = self.fork()
+        for name, extent in candidate.dimensions.items():
+            merged.bind_dimension(name, extent)
+        for variable, dtype in candidate.dtypes.items():
+            merged.bind_dtype(variable, dtype)
+        for variable, device in candidate.devices.items():
+            merged.bind_device(variable, device)
+        self.committed_dimensions.update(merged.dimensions)
+        self.committed_dtypes.update(merged.dtypes)
+        self.committed_devices.update(merged.devices)
 
     def bind_dimension(self, name: str, extent: Extent) -> None:
         """Bind `name` to `extent`, or match the extent it already holds.
@@ -121,15 +150,16 @@ ACTIVE_BINDINGS: ContextVar[Bindings | None] = ContextVar("tenspec_bindings", de
 
 
 @contextmanager
-def validation_scope() -> Iterator[Bindings]:
+def validation_scope(*, bindings: Bindings | None = None) -> Iterator[Bindings]:
     """Open one boundary with fresh bindings, and restore the previous scope on exit.
 
-    The previous scope returns after success and after failure alike.
+    The previous scope returns after success and after failure alike. Integration may
+    supply isolated candidate bindings; otherwise the scope starts empty.
 
     Yields:
         The fresh bindings of the boundary this scope opened.
     """
-    bindings = Bindings()
+    bindings = Bindings() if bindings is None else bindings
     token = ACTIVE_BINDINGS.set(bindings)
     try:
         yield bindings
