@@ -52,6 +52,10 @@ replaces a field value only when the declaration names a transform. A validator 
 wrote around that field keeps its own behavior, as in
 [Pydantic composition](custom-checks.md#pydantic-composition).
 
+Strict JSON loading has an upstream Pydantic limitation that can affect non-array fields too.
+See [Strict JSON input for models](errors-and-limits.md#strict-json-input-for-models) before using
+`model_validate_json` for a model with this mixin.
+
 ## An owned computed result
 
 A declaration checks a value at its boundary. It does not follow that value afterwards, and

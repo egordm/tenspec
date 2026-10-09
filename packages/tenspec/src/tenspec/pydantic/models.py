@@ -1,7 +1,7 @@
 """The mixin that gives one model validation one boundary for its related fields."""
 
 from collections.abc import Callable
-from typing import Any, ClassVar, cast
+from typing import Annotated, Any, ClassVar, cast
 
 from pydantic_core import CoreSchema
 from pydantic_core.core_schema import ValidatorFunctionWrapHandler
@@ -63,7 +63,13 @@ class TensorContracts:
         for name, field in model.model_fields.items():
             if field.annotation is not None and carries_declaration(field.annotation):
                 declared[name] = field.annotation
-                field.annotation = prepare_annotation(field.annotation)
+                complete: Any = (
+                    Annotated[(field.annotation, *field.metadata)]
+                    if field.metadata
+                    else field.annotation
+                )
+                field.annotation = prepare_annotation(complete)
+                field.metadata = []
                 field.validate_default = True
         cls.__tensor_declarations__ = declared
         chained = cls.caller_schema_hook()

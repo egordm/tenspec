@@ -50,7 +50,7 @@ except ValidationError as refusal:
 |---|---|
 | an `async` function | `checked` raises `AnnotationError` |
 | a callable that is not a plain Python function | `checked` raises `AnnotationError` |
-| a union of alternative tensor structures | `AnnotationError`. Write one declaration, and add `None` for an optional tensor |
+| a union mixing tensor and ordinary non-tensor alternatives | `AnnotationError`. Tensor-bearing alternatives and optional `None` are supported |
 | a tensor alias that contains its own name | `AnnotationError` |
 | a device requirement on NumPy | `AnnotationError`, because NumPy places no array |
 | a Tenspec declaration on a model without the mixin | `AnnotationError` when Pydantic builds that model's schema, which is the class statement unless the caller defers the build |
@@ -59,6 +59,26 @@ A declaration relates values inside one boundary. It does not relate the length 
 sequence to an axis, and it does not relate an axis of a nested model to one of its parent.
 Write those by hand, as in
 [A relation the declaration cannot express](pydantic-models.md#a-relation-the-declaration-cannot-express).
+
+## Strict JSON input for models
+
+`TensorContracts` owns a model's binding scope through a Pydantic wrap validator. An upstream
+Pydantic limitation means that strict `model_validate_json` can reject JSON representations of
+tuples, datetimes, decimals, sets, frozen sets and bytes. Nested models can be affected even when
+they declare no tensor. This behavior was reproduced with Pydantic 2.14.0.
+
+The wrapper still reports JSON mode, but its handler receives Python objects. For example, a
+strict tuple field receives a list and refuses it. See
+[Pydantic issue 9204](https://github.com/pydantic/pydantic/issues/9204).
+
+Validation of native Python values remains available. Array serialization and deserialization
+need an explicit representation; Tenspec does not provide one. If an application already has a
+separate storage model, parse its metadata with ordinary Pydantic, reconstruct native values and
+arrays, then validate the computational model. Decoding JSON into a dictionary alone does not
+perform that conversion.
+
+The scope wrapper releases its bindings on success and failure. Changing its lifetime to work
+around this JSON limitation must preserve that behavior.
 
 ## What a declaration does not promise
 

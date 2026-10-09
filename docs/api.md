@@ -133,6 +133,12 @@ to add a backend.
 | `prepare_annotation`, `prepare_declaration` | `tenspec.pydantic.annotations` | a declaration as an ordinary Pydantic annotation |
 | `ArrayBackend` | `tenspec.runtime.arrays` | the seam a new array library implements |
 
+`Bindings.fork()` copies known dimension, dtype and device facts for an isolated attempt.
+`Bindings.merge(candidate)` checks agreement before committing any candidate fact. A disagreement
+raises `TensorMismatch` and leaves all existing facts unchanged. `validation_scope(bindings=...)`
+temporarily exposes supplied bindings and restores the previous scope on success or failure;
+without that argument, it starts empty.
+
 ```python
 import numpy as np
 

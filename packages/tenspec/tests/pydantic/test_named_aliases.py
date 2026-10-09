@@ -160,10 +160,15 @@ def test_caller_validator_runs_when_alias_accepts_array() -> None:
     assert accepted is values
 
 
-def test_union_refused_when_aliases_hide_alternatives() -> None:
-    # Act and Assert
-    with pytest.raises(AnnotationError, match="alternative tensor structures"):
-        validate(np.ones(2), Row | OtherRow)
+def test_union_accepted_when_aliases_name_alternatives() -> None:
+    # Arrange
+    values = np.ones(2)
+
+    # Act
+    result = validate(values, Row | OtherRow)
+
+    # Assert
+    assert result is values
 
 
 def test_alias_preserved_when_no_tensor_declared() -> None:

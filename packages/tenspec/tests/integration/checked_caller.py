@@ -319,6 +319,21 @@ assert_type(
 )
 
 values = np.ones((2, 3))
+
+
+@checked
+def either_backend(values: Float[Shape["rows hidden"]] | TorchFloat[Shape["rows hidden"]]) -> int:
+    """Count rows from either array backend.
+
+    Returns:
+        The row count.
+    """
+    return values.shape[0]
+
+
+assert_type(either_backend(np.ones((2, 3))), int)
+assert_type(either_backend(torch.ones((2, 3))), int)
+
 weights = np.ones(3)
 tensors = (torch.ones(2), torch.ones(3))
 read_only = np.ones(3)

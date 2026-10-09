@@ -35,10 +35,10 @@ Pyrefly accepts the tuple spelling, which is the one the caller file uses.
 ## Ruff and the `Shape` alias
 
 `tenspec.Shape` is a public re-export of `typing.Literal`, and it works at run time. Ruff
-0.16.6 does not follow the re-export, so it reads the shape text as a forward annotation and
+0.16.6 and 0.16.10 do not follow the re-export, so they read the shape text as a forward annotation and
 reports a false diagnostic against it:
 
-| Shape written as | Ruff 0.16.6 reports |
+| Shape written as | Ruff 0.16.6 and 0.16.10 report |
 |---|---|
 | `from tenspec import Shape`, one axis name | `F821 Undefined name` |
 | `from tenspec import Shape`, several axes | `F722 Syntax error in forward annotation` |

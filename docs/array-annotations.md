@@ -44,6 +44,34 @@ same boundary. Its grammar accepts whole numbers, dimension names, `+`, `-`, `*`
 parentheses, and Tenspec evaluates that bounded tree itself. It calls no Python `eval`, and it
 runs no other construct.
 
+## Alternative array types
+
+Use a union when a boundary accepts either backend:
+
+```python
+from typing import Literal as Shape
+
+from tenspec import checked
+from tenspec.numpy import Float
+from tenspec.torch import Float as TorchFloat
+
+
+@checked
+def row_count(
+    values: Float[Shape["rows hidden"]] | TorchFloat[Shape["rows hidden"]],
+) -> int:
+    return values.shape[0]
+```
+
+Each alternative checks against the facts already established at that boundary. Pydantic selects
+the accepted alternative, and only its bindings become visible to later operands. An alternative
+that fails after checking an earlier tuple item leaves no binding behind.
+
+Every non-`None` arm must contain a tensor declaration. An optional `None` remains supported.
+A union does not require different arguments to choose the same backend, and it does not convert
+arrays. If several arms accept, Pydantic's normal selection policy applies. Checks and caller
+validators may run in more than one arm; only binding facts are isolated, not external side effects.
+
 ## Dtype
 
 Each backend module carries the same alias names. A family alias accepts every format of its
