@@ -15,6 +15,14 @@ from tenspec.runtime.bindings import validation_scope
 CALL_CONFIG = ConfigDict(strict=True, arbitrary_types_allowed=True)
 """The setup a checked call applies: strict ordinary values, and array types permitted."""
 
+CALL_VALIDATOR = validate_call(config=CALL_CONFIG, validate_return=True)
+"""Pydantic's call decorator, built once at module level.
+
+validate_call keeps the local namespace of the frame that calls it. From a function, that
+is a FrameLocalsProxy (Python 3.13 and later), which pins the frame and, through f_back,
+every caller's locals for as long as the prepared check lives. At module level Pydantic
+keeps no namespace. The declarations are already evaluated, so none is needed."""
+
 
 def function_with_annotations(function: FunctionType, annotations: dict[str, Any]) -> FunctionType:
     """A copy of `function` that carries `annotations`, leaving the original unchanged.
@@ -51,9 +59,7 @@ def prepared_call(function: FunctionType, declared: dict[str, Any]) -> Callable[
         name: prepare_annotation(value) if name == "return" else prepare_declaration(value)
         for name, value in declared.items()
     }
-    return validate_call(config=CALL_CONFIG, validate_return=True)(
-        function_with_annotations(function, prepared)
-    )
+    return CALL_VALIDATOR(function_with_annotations(function, prepared))
 
 
 def with_receiver(declared: dict[str, Any], receiver: type) -> dict[str, Any]:
