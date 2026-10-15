@@ -1,6 +1,8 @@
 """What a checked call does with a default, and what it leaves to the caller."""
 
+import gc
 import threading
+import weakref
 from collections.abc import Callable
 from typing import Annotated, Self
 from typing import Literal as Shape
@@ -227,3 +229,51 @@ def test_refuses_transform_outside_the_alias() -> None:
         @checked
         def store(values: Annotated[Float[Shape["rows"]], CopyReadOnly]) -> int:
             return values.shape[0]
+
+
+class Held:
+    """An object only the caller's local holds, such as a loaded model."""
+
+
+def caller_holding(build: Callable[[], object]) -> tuple[weakref.ref[Held], object]:
+    """Hold one object in a local, run one cold checked build, and return.
+
+    Returns:
+        A weak reference to the held object, and what the build returned.
+    """
+    held = Held()
+    return weakref.ref(held), build()
+
+
+def first_self_call() -> object:
+    class Cold(Scale):
+        """A receiver whose Self specialization this call builds."""
+
+    return Cold.fit(np.ones(3))
+
+
+def decoration() -> object:
+    @checked
+    def widen(values: Float[Shape["rows"]]) -> Float[Shape["rows"]]:
+        return values
+
+    return widen
+
+
+@pytest.mark.parametrize(
+    "build",
+    [first_self_call, decoration],
+    ids=["the first call of a Self method", "decorating inside a function"],
+)
+def test_caller_locals_released_when_checked_schema_built_inside_caller(
+    build: Callable[[], object],
+) -> None:
+    # Arrange: the parametrized `build` runs one cold checked build inside the caller
+
+    # Act
+    released, built = caller_holding(build)
+    gc.collect()
+
+    # Assert: the prepared schema outlives the call; the caller's locals must not
+    assert built is not None
+    assert released() is None

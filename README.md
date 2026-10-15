@@ -21,7 +21,7 @@ pip install "tenspec[numpy]"   # or: uv add "tenspec[numpy]"
 Name the array library you need as an extra: `numpy` or `torch`. `import tenspec` loads neither
 one.
 
-This is an early release, at version 0.2.0, and the interface can change before version 1.0. It
+This is an early release, at version 0.2.1, and the interface can change before version 1.0. It
 needs Python 3.13 or newer. The tested interpreter and array-library combinations are in
 [the support matrix](docs/type-checkers.md#the-measured-support-matrix).
 
