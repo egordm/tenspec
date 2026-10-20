@@ -97,9 +97,8 @@ the array it received.
 A backend representing a format is not the same as your installed NumPy or Torch being able to
 compute with it. Tenspec answers the first question alone.
 
-The generic NumPy declaration is `NDArray`, so it permits a supported `ndarray` subclass. An
-exact concrete class is not a built-in requirement. A property of your own can express one,
-and that stays your class.
+The generic NumPy declaration is `NDArray`, so it permits a supported `ndarray` subclass.
+Add `tenspec.numpy.ExactNDArray` to require the exact `numpy.ndarray` class without converting it.
 
 ## Device
 

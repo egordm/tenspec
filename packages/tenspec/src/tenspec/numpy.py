@@ -59,6 +59,60 @@ class Finite(ArrayProperty[np.generic]):
             raise TensorMismatch(requirement="Finite", observed="non-finite entries")
 
 
+class ExactNDArray(ArrayProperty[np.generic]):
+    """Require the exact numpy.ndarray class, refusing every subclass.
+
+    This property never converts the input. Properties run after declared transforms,
+    so pairing it with CopyReadOnly checks the class after copying.
+    """
+
+    @staticmethod
+    def validate(values: NDArray[np.generic]) -> None:
+        """Check the concrete class.
+
+        Raises:
+            TensorMismatch: The array is an ndarray subclass.
+        """
+        if type(values) is not np.ndarray:
+            raise TensorMismatch(requirement="ExactNDArray", observed=type(values).__name__)
+
+
+class NonPositive(ArrayProperty[np.floating[Any]]):
+    """Refuse any positive entry in a real floating array.
+
+    NaN is neither positive nor negative and passes this check. Add Finite to refuse it.
+    Zero and negative infinity pass.
+    """
+
+    @staticmethod
+    def validate(values: NDArray[np.floating[Any]]) -> None:
+        """Check the sign of every entry.
+
+        Raises:
+            TensorMismatch: An entry is positive.
+        """
+        if bool((values > 0).any()):
+            raise TensorMismatch(requirement="NonPositive", observed="an entry is positive")
+
+
+class NonNegative(ArrayProperty[np.floating[Any]]):
+    """Refuse any negative entry in a real floating array.
+
+    NaN is neither positive nor negative and passes this check. Add Finite to refuse it.
+    Zero and positive infinity pass.
+    """
+
+    @staticmethod
+    def validate(values: NDArray[np.floating[Any]]) -> None:
+        """Check the sign of every entry.
+
+        Raises:
+            TensorMismatch: An entry is negative.
+        """
+        if bool((values < 0).any()):
+            raise TensorMismatch(requirement="NonNegative", observed="an entry is negative")
+
+
 class NonEmpty(ArrayProperty[np.generic]):
     """The array holds at least one element."""
 
@@ -129,6 +183,26 @@ class CopyReadOnly(ArrayTransform[np.generic]):
         owned = values.copy()
         owned.setflags(write=False)
         return owned.view()
+
+
+class CanonicalBool(ArrayTransform[np.bool_]):
+    """Copy a boolean array with every false byte zero and every true byte one.
+
+    A buffer reinterpreted with ``view(np.bool_)`` can store true as any non-zero byte.
+    This transform leaves the input unchanged and returns separate storage with the same
+    concrete class, shape and dtype. Name CopyReadOnly after it for a read-only result.
+    """
+
+    @staticmethod
+    def transform(values: NDArray[np.bool_]) -> NDArray[np.bool_]:
+        """Copy the values and canonicalize their boolean bytes.
+
+        Returns:
+            A copy whose boolean bytes are all zero or one.
+        """
+        canonical = values.copy()
+        np.not_equal(values, 0, out=canonical)
+        return canonical
 
 
 NUMPY_AUTHOR_BASES = (ArrayProperty, ArrayTransform)

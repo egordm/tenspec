@@ -66,13 +66,21 @@ operation and the caller receive. A declaration names every transform before its
 .. autoclass:: tenspec.Materialized
 ```
 
-These four import from `tenspec` and work on either backend. The next two are NumPy's own,
-because they read a NumPy writeable flag:
+These four import from `tenspec` and work on either backend. The following operations
+import from `tenspec.numpy`:
 
 ```{eval-rst}
 .. autoclass:: tenspec.numpy.ReadOnly
 
 .. autoclass:: tenspec.numpy.CopyReadOnly
+
+.. autoclass:: tenspec.numpy.ExactNDArray
+
+.. autoclass:: tenspec.numpy.CanonicalBool
+
+.. autoclass:: tenspec.numpy.NonPositive
+
+.. autoclass:: tenspec.numpy.NonNegative
 ```
 
 [`CopyReadOnly` against `ReadOnly`](custom-checks.md#copyreadonly-against-readonly) states what neither
