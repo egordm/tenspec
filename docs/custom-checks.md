@@ -106,6 +106,9 @@ device transfer belong where a reader can see them.
 | `Contiguous` | `tenspec` | the array uses C-contiguous storage |
 | `Materialized` | `tenspec` | the array holds data rather than metadata alone. Every NumPy array does; a Torch meta or fake tensor does not |
 | `ReadOnly` | `tenspec.numpy` | this array's own writeable flag is off |
+| `ExactNDArray` | `tenspec.numpy` | the concrete class is exactly `numpy.ndarray`, with no conversion |
+| `NonPositive` | `tenspec.numpy` | no real floating entry is positive; NaN passes, so add `Finite` to refuse it |
+| `NonNegative` | `tenspec.numpy` | no real floating entry is negative; NaN passes, so add `Finite` to refuse it |
 
 On Torch, `Finite` raises `ConstraintEvaluationError` for a tensor that holds metadata alone,
 because the values do not exist to read. That is never a measured refusal.
@@ -139,6 +142,7 @@ that contains its own name stays with Pydantic, and Tenspec returns it unchanged
 | Name | Kind | What it does |
 |---|---|---|
 | `tenspec.numpy.CopyReadOnly` | transform | copies the array, turns the copy's writeable flag off, and returns a view of that copy |
+| `tenspec.numpy.CanonicalBool` | transform | copies a boolean array with every byte zero or one; name `CopyReadOnly` after it for a read-only result |
 | `tenspec.numpy.ReadOnly` | property | reads the array's own writeable flag, and refuses when it is on |
 
 `CopyReadOnly` copies on every validation, so it costs time and memory each time, and no cache
