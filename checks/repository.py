@@ -35,10 +35,7 @@ class SourceRoots:
 
     def __post_init__(self) -> None:
         if not self.paths or any(
-            not isinstance(root, str)
-            or not (path := PurePosixPath(root)).parts
-            or path.is_absolute()
-            or ".." in path.parts
+            not (path := PurePosixPath(root)).parts or path.is_absolute() or ".." in path.parts
             for root in self.paths
         ):
             raise ValueError(
@@ -52,7 +49,9 @@ class SourceRoots:
         tools = tomllib.loads(text).get("tool", {})
         quality = tools.get("quality") if isinstance(tools, dict) else None
         roots = quality.get("source-roots") if isinstance(quality, dict) else None
-        return cls(tuple(roots) if isinstance(roots, list) else ())
+        if not isinstance(roots, list) or not all(isinstance(root, str) for root in roots):
+            return cls(())
+        return cls(tuple(roots))
 
     def contains(self, path: str) -> bool:
         candidate = PurePosixPath(path)
