@@ -1,0 +1,140 @@
+import pytest
+from checks.repository import Repository
+from checks.vocabulary import Term, VocabularyCheck, read_terms
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "batchSidecarPath",
+        "batch_sidecar_path",
+        "SIDECAR",
+        "SidecarPath",
+        "batchSIDECARPath",
+        "SiDeCaR",
+        "sIdecar",
+        "sidecar2",
+        "2sidecar",
+        "sidecarpet",
+    ],
+)
+def test_reports_banned_term_when_identifier_has_word_component(text: str) -> None:
+    # Arrange
+    check = VocabularyCheck([Term("sidecar", "Describe the contents", "manifest")])
+
+    # Act
+    findings = check.findings({"example.py": text})
+
+    # Assert
+    assert len(findings) == 1
+    assert findings[0].rule == "vocabulary.sidecar"
+
+
+def test_passes_when_text_contains_no_banned_substring() -> None:
+    # Arrange
+    check = VocabularyCheck([Term("sidecar", "Describe the contents", "manifest")])
+
+    # Act
+    findings = check.findings({"example.py": "manifest = 1"})
+
+    # Assert
+    assert findings == []
+
+
+def test_counts_file_name_when_name_contains_banned_term() -> None:
+    # Arrange
+    check = VocabularyCheck([Term("sidecar", "Describe the contents", "manifest")])
+
+    # Act
+    counts = check.counts({"batch_sidecar.py": ""})
+
+    # Assert
+    assert counts["vocabulary.sidecar"] == 1
+
+
+def test_skips_definitions_when_scanning_terms_and_own_fixtures() -> None:
+    # Arrange
+    check = VocabularyCheck([Term("sidecar", "Describe the contents", "manifest")])
+
+    # Act
+    findings = check.findings(
+        {"checks/banned-terms.toml": "sidecar", "tests/checks/test_terms.py": "sidecar"}
+    )
+
+    # Assert
+    assert findings == []
+
+
+def test_counts_process_identifiers_when_source_mentions_records() -> None:
+    # Arrange
+    check = VocabularyCheck([Term("forbidden", "Describe contents", "manifest")])
+
+    # Act
+    counts = check.counts(
+        {"src/example.py": "# M12-S2 D12 D123 B123 G2 gap M1 port\n", "docs/example.md": "D12"}
+    )
+
+    # Assert
+    assert counts["vocabulary.process-identifiers"] == 6
+
+
+def test_loads_term_metadata_when_configuration_is_valid() -> None:
+    # Arrange
+    text = '[[terms]]\nword = "sidecar"\nreason = "Describe contents"\nreplacement = "manifest"\n'
+
+    # Act
+    terms = read_terms(text)
+
+    # Assert
+    assert terms == [Term("sidecar", "Describe contents", "manifest")]
+
+
+@pytest.mark.parametrize(
+    "path",
+    ["example.txt", "example.rst", "example.json", "example.yaml", "example.ipynb", "SIDECAR.bin"],
+)
+def test_reports_banned_term_when_other_tracked_formats_contain_it(path: str) -> None:
+    # Arrange
+    check = VocabularyCheck([Term("sidecar", "Describe contents", "manifest")])
+    text = "" if "SIDECAR" in path else "sidecar"
+
+    # Act
+    findings = check.findings({path: text})
+
+    # Assert
+    assert len(findings) == 1
+
+
+def test_reports_empty_subject_when_no_vocabulary_files_are_read() -> None:
+    # Arrange
+    check = VocabularyCheck([Term("sidecar", "Describe contents", "manifest")])
+
+    # Act
+    findings = check.findings({})
+
+    # Assert
+    assert findings[0].rule == "empty-subject"
+
+
+def test_reports_error_when_term_definitions_are_empty() -> None:
+    # Arrange
+    terms: list[Term] = []
+
+    # Act & Assert
+    with pytest.raises(ValueError, match="must not be empty"):
+        VocabularyCheck(terms)
+
+
+def test_reports_path_when_tracked_entry_has_no_utf8_file_contents() -> None:
+    # Arrange
+    check = VocabularyCheck([Term("sidecar", "Describe contents", "manifest")])
+    files = {"binary.dat": b"\xff"}
+    paths = ["binary.dat", "sidecar-submodule"]
+    texts = Repository.decode_utf8(files, paths)
+
+    # Act
+    findings = check.findings(texts)
+
+    # Assert
+    assert len(findings) == 1
+    assert findings[0].path == "sidecar-submodule"

@@ -1,0 +1,17 @@
+[structure]
+dense-functions = 0
+long-functions = 0
+long-modules = 0
+wide-directories = 0
+
+[suppressed]
+A001 = 1
+ARG002 = 1
+ARG004 = 1
+N806 = 4
+N818 = 1
+PLC0414 = 1
+
+[vocabulary]
+process-identifiers = 0
+sidecar = 1

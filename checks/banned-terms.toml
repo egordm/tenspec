@@ -1,0 +1,4 @@
+[[terms]]
+word = "sidecar"
+reason = "The owner requires names that describe the file's contents"
+replacement = "a name describing the file's contents"

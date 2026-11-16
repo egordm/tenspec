@@ -35,6 +35,7 @@ ignore = [
 ]
 
 [lint.flake8-tidy-imports.banned-api]
+"typing.no_type_check".msg = "Keep function bodies visible to the type checker."
 # Config comes from a pydantic-settings object, never an ad-hoc env read. The legitimate exception
 # (writing the process env to hand vars to a child process) takes a narrow `# noqa: TID251` with a
 # reason.
@@ -48,6 +49,8 @@ convention = "google"
 known-first-party = ["tenspec"]
 
 [lint.per-file-ignores]
+# Quality checks report to the terminal and run git, ruff and lint-imports with fixed argument lists.
+"checks/**" = ["TID251", "S603", "S607"]
 # The Sphinx configuration: Sphinx executes this file and reads its module-level names, so it
 # is never imported as part of a package (INP001).
 "docs/conf.py" = ["INP001"]

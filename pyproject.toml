@@ -45,13 +45,19 @@ tenspec = { workspace = true }
 [tool.ty.environment]
 python-version = "3.13"
 
+[tool.ty.rules]
+unused-ignore-comment = "error"
+blanket-ignore-comment = "error"
+
 [tool.pytest.ini_options]
 # One pytest run over the member's tests, the integration tests included. Those start three
 # checker processes, and nothing here deselects them. `importlib` import mode avoids needing
 # __init__.py in tests/ trees.
-testpaths = ["packages"]
+testpaths = ["packages", "tests/checks"]
 addopts = "-ra --strict-markers --strict-config --import-mode=importlib"
 filterwarnings = ["error"]
+# Importlib mode needs the repository root to import the local checks package.
+pythonpath = ["."]
 
 # poe tasks are defined in poe_tasks.toml (the verbose `[tool.poe.tasks.*]` form), included here.
 [tool.poe]
