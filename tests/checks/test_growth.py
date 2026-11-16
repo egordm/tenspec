@@ -420,3 +420,32 @@ def test_reports_module_growth_when_large_module_grows_in_renamed_file(
 
     # Assert
     assert [item.message for item in findings] == ["module grew to 601 lines from 600"]
+
+
+def test_passes_when_wide_directory_is_renamed_with_its_modules(source_roots: SourceRoots) -> None:
+    # Arrange
+    base: dict[str, str] = {f"library/old/module{index}.py": "" for index in range(12)}
+    branch: dict[str, str] = {f"library/new/module{index}.py": "" for index in range(12)}
+    renamed = {path: path.replace("/new/", "/old/") for path in branch}
+
+    # Act
+    findings = StructureGrowth(base, branch, source_roots, renamed=renamed).findings()
+
+    # Assert
+    assert findings == []
+
+
+def test_reports_directory_growth_when_renamed_wide_directory_gains_a_module(
+    source_roots: SourceRoots,
+) -> None:
+    # Arrange
+    base: dict[str, str] = {f"library/old/module{index}.py": "" for index in range(12)}
+    branch: dict[str, str] = {f"library/new/module{index}.py": "" for index in range(12)}
+    renamed = {path: path.replace("/new/", "/old/") for path in branch}
+    branch["library/new/added.py"] = ""
+
+    # Act
+    findings = StructureGrowth(base, branch, source_roots, renamed=renamed).findings()
+
+    # Assert
+    assert [item.message for item in findings] == ["directory grew to 13 modules from 12"]
