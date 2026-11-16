@@ -126,9 +126,32 @@ class ImportContractChanges:
             self.section_follows_modules(section, options, new[section], removed, added)
             for section, options in old.items()
         )
+        stable = self.stable_entries(old, new)
         return sections_follow and self.remaining_policy(
-            before, removed, old
-        ) == self.remaining_policy(after, added, new)
+            before, removed, old, stable
+        ) == self.remaining_policy(after, added, new, stable)
+
+    @classmethod
+    def stable_entries(
+        cls, old: dict[str, dict[str, str]], new: dict[str, dict[str, str]]
+    ) -> frozenset[tuple[str, str, str]]:
+        """Find the entries both files carry in one field, which a module change never removes.
+
+        An entry declared before its package exists names an added module on both sides.
+
+        Returns:
+            Section, field and entry of every line present in that field of both files.
+        """
+        return frozenset(
+            (section, key, entry)
+            for section, options in old.items()
+            for key, value in options.items()
+            for entry in cls.entries(value) & cls.entries(new[section].get(key, ""))
+        )
+
+    @staticmethod
+    def entries(value: str) -> set[str]:
+        return {line.strip() for line in value.splitlines() if line.strip()}
 
     @staticmethod
     def parse(data: bytes) -> dict[str, dict[str, str]]:
@@ -178,20 +201,29 @@ class ImportContractChanges:
                 if old_layers is None or old_layers != new_layers:
                     return False
                 continue
+            stable = frozenset(self.entries(before) & self.entries(after))
             if before != after and self.remaining_lines(
-                before, removed, key
-            ) != self.remaining_lines(after, added, key):
+                before, removed, key, stable
+            ) != self.remaining_lines(after, added, key, stable):
                 return False
         return True
 
     @classmethod
-    def remaining_lines(cls, text: str, changed: set[str], key: str) -> list[str]:
+    def remaining_lines(
+        cls, text: str, changed: set[str], key: str, stable: frozenset[str]
+    ) -> list[str]:
         lines = [line.strip() for line in text.splitlines() if line.strip()]
-        return [line for line in lines if not cls.changed_entry(line, changed, key)]
+        return [
+            line for line in lines if line in stable or not cls.changed_entry(line, changed, key)
+        ]
 
     @classmethod
     def remaining_policy(
-        cls, data: bytes, changed: set[str], sections: dict[str, dict[str, str]]
+        cls,
+        data: bytes,
+        changed: set[str],
+        sections: dict[str, dict[str, str]],
+        stable: frozenset[tuple[str, str, str]],
     ) -> list[str]:
         """Retain raw non-module lines, including comments and stable formatting.
 
@@ -200,15 +232,20 @@ class ImportContractChanges:
         """
         fields = frozenset().union(*cls.module_fields.values())
         remaining = []
+        section = field = ""
         for line, layer_value in LayerContractChanges.raw_lines(data, sections, changed):
             if layer_value:
                 if line:
                     remaining.append(line)
                 continue
             entry = line.strip()
+            title = re.fullmatch(r"\[(.+)\]", entry)
+            if title is not None:
+                section = title[1]
             header = re.fullmatch(r"(\w+)\s*[=:]\s*(.*)", entry)
             if header is not None and header[1] in fields:
                 keys = (header[1],)
+                field = header[1]
                 entry = header[2]
                 # The header's own spelling is policy text: keep it for the comparison.
                 written = line.rstrip()
@@ -217,7 +254,9 @@ class ImportContractChanges:
                     continue
             else:
                 keys = fields
-            if not any(cls.changed_entry(entry, changed, key) for key in keys):
+            if (section, field, entry) in stable or not any(
+                cls.changed_entry(entry, changed, key) for key in keys
+            ):
                 remaining.append(line)
         return remaining
 
