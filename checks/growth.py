@@ -87,8 +87,11 @@ class StructureGrowth:
                     )
                 )
         before, after = self.directory_counts(self.base), self.directory_counts(self.branch)
+        kept = self.directory_counts(
+            {path: "" for path in self.branch if self.renamed.get(path, path) in self.base}
+        )
         for path, count in after.items():
-            previous = before.get(path, 0)
+            previous = max(before.get(path, 0), kept.get(path, 0))
             if count > max(10, previous):
                 findings.append(
                     Finding(
