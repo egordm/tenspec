@@ -6,7 +6,7 @@ wide-directories = 0
 
 [suppressed]
 A001 = 1
-ARG002 = 1
+ARG002 = 0
 ARG004 = 1
 N806 = 4
 N818 = 1
