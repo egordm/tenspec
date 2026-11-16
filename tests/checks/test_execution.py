@@ -18,7 +18,7 @@ def test_selects_base_checks_when_base_contains_package() -> None:
 
 def test_uses_bootstrap_when_base_has_no_checks() -> None:
     # Arrange
-    paths = {"src/example.py", "ruff.toml"}
+    paths = {"library/example.py", "ruff.toml"}
 
     # Act
     selected = CheckRuns.has_base_checks(paths)

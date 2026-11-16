@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 from checks.growth import GrowthCheck, Measurement, StructureGrowth, measurements
+from checks.repository import SourceRoots
 from checks.source import PythonSource
 
 
@@ -126,17 +127,19 @@ def test_reports_growth_when_statements_are_merged_without_reducing_nodes() -> N
     assert any(item.rule == "function-nodes" for item in findings)
 
 
-def test_reports_size_growth_when_module_and_directory_are_already_large() -> None:
+def test_reports_size_growth_when_module_and_directory_are_already_large(
+    source_roots: SourceRoots,
+) -> None:
     # Arrange
-    base = {f"packages/tenspec/src/tenspec/domain/module{index}.py": "" for index in range(11)}
-    base["packages/tenspec/src/tenspec/domain/module0.py"] = "value = 1\n" * 501
+    base = {f"library/domain/module{index}.py": "" for index in range(11)}
+    base["library/domain/module0.py"] = "value = 1\n" * 501
     branch = base | {
-        "packages/tenspec/src/tenspec/domain/new.py": "",
-        "packages/tenspec/src/tenspec/domain/module0.py": "value = 1\n" * 502,
+        "library/domain/new.py": "",
+        "library/domain/module0.py": "value = 1\n" * 502,
     }
 
     # Act
-    findings = StructureGrowth(base, branch).findings()
+    findings = StructureGrowth(base, branch, source_roots).findings()
 
     # Assert
     assert {item.rule for item in findings} == {"module-lines", "directory-modules"}
@@ -176,13 +179,15 @@ def test_reports_error_when_function_file_has_no_functions() -> None:
         measurements({"module.py": "value = 1"}, [diagnostic], Path("/"))
 
 
-def test_passes_when_large_test_directory_gains_module() -> None:
+def test_passes_when_large_test_directory_gains_module(source_roots: SourceRoots) -> None:
     # Arrange
-    base = {f"tests/core/test_case{index}.py": "" for index in range(133)}
+    base = {"library/module.py": ""} | {
+        f"tests/core/test_case{index}.py": "" for index in range(133)
+    }
     branch = base | {"tests/core/test_new_case.py": ""}
 
     # Act
-    findings = StructureGrowth(base, branch).findings()
+    findings = StructureGrowth(base, branch, source_roots).findings()
 
     # Assert
     assert findings == []
@@ -308,14 +313,56 @@ def test_reports_error_when_diagnostic_matches_neither_function_nor_overload() -
         measurements({"module.py": text}, [diagnostic], Path("/"))
 
 
-def test_passes_when_large_documentation_module_grows() -> None:
+def test_passes_when_large_documentation_module_grows(source_roots: SourceRoots) -> None:
     # Arrange
     path = "docs/example.py"
-    base: dict[str, str] = {path: "value = 1\n" * 501}
-    branch: dict[str, str] = {path: "value = 1\n" * 502}
+    base: dict[str, str] = {"library/module.py": "", path: "value = 1\n" * 501}
+    branch: dict[str, str] = base | {path: "value = 1\n" * 502}
 
     # Act
-    findings = StructureGrowth(base, branch).findings()
+    findings = StructureGrowth(base, branch, source_roots).findings()
 
     # Assert
     assert findings == []
+
+
+@pytest.mark.parametrize("path", ["library/grown.py", "outside/grown.py"])
+def test_reports_module_growth_when_file_is_under_configured_root(
+    path: str, source_roots: SourceRoots
+) -> None:
+    # Arrange
+    base = {"library/anchor.py": "", path: "value = 1\n" * 500}
+    branch = base | {path: "value = 1\n" * 501}
+
+    # Act
+    findings = StructureGrowth(base, branch, source_roots).findings()
+
+    # Assert
+    assert [item.path for item in findings] == ([path] if path.startswith("library/") else [])
+
+
+def test_reports_both_modules_when_two_roots_grow() -> None:
+    # Arrange
+    roots = SourceRoots.from_project(
+        '[tool.quality]\nsource-roots = ["library/one", "library/two"]\n'
+    )
+    paths = ["library/one/module.py", "library/two/module.py"]
+    base: dict[str, str] = dict.fromkeys(paths, "value = 1\n" * 500)
+    branch: dict[str, str] = dict.fromkeys(paths, "value = 1\n" * 501)
+
+    # Act
+    findings = StructureGrowth(base, branch, roots).findings()
+
+    # Assert
+    assert {item.path for item in findings} == set(paths)
+
+
+def test_reports_empty_subject_when_no_configured_source_is_read(source_roots: SourceRoots) -> None:
+    # Arrange
+    branch = {"outside/module.py": "value = 1\n"}
+
+    # Act
+    findings = StructureGrowth({}, branch, source_roots).findings()
+
+    # Assert
+    assert [item.rule for item in findings] == ["empty-subject"]

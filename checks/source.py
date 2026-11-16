@@ -4,6 +4,7 @@ import ast
 import io
 import tokenize
 from dataclasses import dataclass
+from typing import override
 
 
 @dataclass(frozen=True)
@@ -66,11 +67,13 @@ class PythonSource(ast.NodeVisitor):
             for row in range(docstring.lineno, (docstring.end_lineno or docstring.lineno) + 1)
         }
 
+    @override
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
         self.names.append(node.name)
         self.generic_visit(node)
         self.names.pop()
 
+    @override
     def visit_FunctionDef(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> None:
         if any(ast.unparse(decorator) in self.overloads for decorator in node.decorator_list):
             self.overload_lines.add(node.lineno)
@@ -86,6 +89,7 @@ class PythonSource(ast.NodeVisitor):
         self.generic_visit(node)
         self.names.pop()
 
+    @override
     def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
         self.visit_FunctionDef(node)
 
