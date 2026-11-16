@@ -2,6 +2,34 @@
 # Activate once per clone: uv run pre-commit install
 
 repos:
+  # The static part of `poe check`. No remote CI runs on a push, so a commit runs it here.
+  # Tool versions come from uv.lock.
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff lint
+        entry: uv run --locked poe lint
+        language: system
+        types_or: [python, pyi, toml]
+        pass_filenames: false
+      - id: ruff-format
+        name: ruff format check
+        entry: uv run --locked poe format-check
+        language: system
+        types_or: [python, pyi, toml]
+        pass_filenames: false
+      - id: ty
+        name: ty type check
+        entry: uv run --locked poe typecheck
+        language: system
+        types_or: [python, pyi, toml]
+        pass_filenames: false
+      - id: quality
+        name: quality checks (suppressions, budgets, growth, configuration, vocabulary)
+        entry: uv run --locked poe quality
+        language: system
+        pass_filenames: false
+
   # Standard hygiene; all auto-fix or fail only on real problems.
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
