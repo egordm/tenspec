@@ -85,6 +85,20 @@ def test_counts_process_identifiers_when_source_mentions_records(source_roots: S
     assert counts["vocabulary.process-identifiers"] == 6
 
 
+def test_ignores_lint_rule_code_when_it_sits_in_a_suppression_comment(
+    source_roots: SourceRoots,
+) -> None:
+    # Arrange
+    check = VocabularyCheck([Term("forbidden", "Describe contents", "manifest")], source_roots)
+    source = "value = build()  # noqa: B008\nother = 1  # see B123\n"
+
+    # Act
+    counts = check.counts({"library/example.py": source})
+
+    # Assert
+    assert counts["vocabulary.process-identifiers"] == 1
+
+
 def test_loads_term_metadata_when_configuration_is_valid() -> None:
     # Arrange
     text = '[[terms]]\nword = "sidecar"\nreason = "Describe contents"\nreplacement = "manifest"\n'

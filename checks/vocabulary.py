@@ -19,6 +19,8 @@ class VocabularyCheck:
     process_pattern = re.compile(
         r"M\d+-S\d+|\bD\d{2,3}\b|\bB\d{3}\b|\bG\d\b gap|M1 port", re.IGNORECASE
     )
+    # A lint rule code such as B008 has the shape of a record identifier.
+    lint_directive = re.compile(r"#\s*noqa:[^#]*")
 
     def __init__(self, terms: list[Term], source_roots: SourceRoots) -> None:
         if not terms:
@@ -49,7 +51,9 @@ class VocabularyCheck:
                             "vocabulary.process-identifiers",
                             f"process identifier {match[0]!r} belongs in project records",
                         )
-                        for match in self.process_pattern.finditer(line)
+                        for match in self.process_pattern.finditer(
+                            self.lint_directive.sub("", line)
+                        )
                     )
         return findings
 
