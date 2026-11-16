@@ -3,7 +3,7 @@
 from abc import ABC
 from collections.abc import Hashable
 from types import MappingProxyType
-from typing import Annotated, Any
+from typing import Annotated, Any, override
 
 import torch
 from torch import Tensor
@@ -64,6 +64,7 @@ class Materialized(ArrayProperty):
     """The tensor holds actual data, rather than metadata alone."""
 
     @staticmethod
+    @override
     def validate(values: Tensor) -> None:
         if not is_materialized(values):
             raise TensorMismatch(requirement="Materialized", observed="metadata alone")
@@ -79,6 +80,7 @@ class Finite(ArrayProperty):
     """
 
     @staticmethod
+    @override
     def validate(values: Tensor) -> None:
         if not is_materialized(values):
             raise ConstraintEvaluationError(
@@ -94,6 +96,7 @@ class NonEmpty(ArrayProperty):
     """The tensor holds at least one element."""
 
     @staticmethod
+    @override
     def validate(values: Tensor) -> None:
         if values.numel() == 0:
             raise TensorMismatch(
@@ -105,6 +108,7 @@ class Contiguous(ArrayProperty):
     """The tensor uses C-contiguous storage."""
 
     @staticmethod
+    @override
     def validate(values: Tensor) -> None:
         if not values.is_contiguous():
             raise TensorMismatch(
@@ -144,6 +148,7 @@ class TorchArrays(ArrayBackend[Tensor]):
     )
     reports_device = True
 
+    @override
     def shape(self, value: Tensor) -> tuple[int, ...]:
         """The extent of every axis.
 
@@ -152,6 +157,7 @@ class TorchArrays(ArrayBackend[Tensor]):
         """
         return tuple(value.shape)
 
+    @override
     def dtype(self, value: Tensor) -> DTypeId:
         """The logical scalar format of the tensor.
 
@@ -169,6 +175,7 @@ class TorchArrays(ArrayBackend[Tensor]):
                 f"Torch dtype {name!r} has no logical scalar format"
             ) from cause
 
+    @override
     def device(self, value: Tensor) -> properties.DeviceId | None:
         """Where the tensor sits, with its ordinal when Torch reports one.
 
@@ -177,6 +184,7 @@ class TorchArrays(ArrayBackend[Tensor]):
         """
         return properties.DeviceId(kind=value.device.type, ordinal=value.device.index)
 
+    @override
     def native_dtype(self, value: Tensor) -> Hashable:
         """Torch's own dtype object.
 
@@ -185,6 +193,7 @@ class TorchArrays(ArrayBackend[Tensor]):
         """
         return value.dtype
 
+    @override
     def operation_formats(self, operation: type[operations.Operation[Any]]) -> frozenset[DTypeId]:
         """Every logical format one Torch operation accepts.
 

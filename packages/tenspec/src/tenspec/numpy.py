@@ -3,7 +3,7 @@
 from abc import ABC
 from collections.abc import Hashable, Mapping
 from types import MappingProxyType
-from typing import Annotated, Any, get_args, get_origin
+from typing import Annotated, Any, get_args, get_origin, override
 
 import numpy as np
 from numpy.typing import NDArray
@@ -54,6 +54,7 @@ class Finite(ArrayProperty[np.generic]):
     """Every element of the array is a finite number. An integer array always passes."""
 
     @staticmethod
+    @override
     def validate(values: NDArray[np.generic]) -> None:
         if values.dtype.kind in "fc" and not bool(np.isfinite(values).all()):
             raise TensorMismatch(requirement="Finite", observed="non-finite entries")
@@ -67,6 +68,7 @@ class ExactNDArray(ArrayProperty[np.generic]):
     """
 
     @staticmethod
+    @override
     def validate(values: NDArray[np.generic]) -> None:
         """Check the concrete class.
 
@@ -85,6 +87,7 @@ class NonPositive(ArrayProperty[np.floating[Any]]):
     """
 
     @staticmethod
+    @override
     def validate(values: NDArray[np.floating[Any]]) -> None:
         """Check the sign of every entry.
 
@@ -103,6 +106,7 @@ class NonNegative(ArrayProperty[np.floating[Any]]):
     """
 
     @staticmethod
+    @override
     def validate(values: NDArray[np.floating[Any]]) -> None:
         """Check the sign of every entry.
 
@@ -117,6 +121,7 @@ class NonEmpty(ArrayProperty[np.generic]):
     """The array holds at least one element."""
 
     @staticmethod
+    @override
     def validate(values: NDArray[np.generic]) -> None:
         if values.size == 0:
             raise TensorMismatch(requirement="NonEmpty", observed=describe_empty(values.shape))
@@ -126,6 +131,7 @@ class Contiguous(ArrayProperty[np.generic]):
     """The array uses C-contiguous storage."""
 
     @staticmethod
+    @override
     def validate(values: NDArray[np.generic]) -> None:
         if not values.flags.c_contiguous:
             raise TensorMismatch(
@@ -137,6 +143,7 @@ class Materialized(ArrayProperty[np.generic]):
     """The array holds actual data. Every NumPy array does, so this accepts every array."""
 
     @staticmethod
+    @override
     def validate(values: NDArray[np.generic]) -> None:
         """Accept every array."""
 
@@ -149,6 +156,7 @@ class ReadOnly(ArrayProperty[np.generic]):
     """
 
     @staticmethod
+    @override
     def validate(values: NDArray[np.generic]) -> None:
         if values.flags.writeable:
             raise TensorMismatch(requirement="ReadOnly", observed="its writeable flag on")
@@ -174,6 +182,7 @@ class CopyReadOnly(ArrayTransform[np.generic]):
     """
 
     @staticmethod
+    @override
     def transform[D: np.generic](values: NDArray[D]) -> NDArray[D]:
         """Copy the array, seal the copy, and return a view of it.
 
@@ -194,6 +203,7 @@ class CanonicalBool(ArrayTransform[np.bool_]):
     """
 
     @staticmethod
+    @override
     def transform(values: NDArray[np.bool_]) -> NDArray[np.bool_]:
         """Copy the values and canonicalize their boolean bytes.
 
@@ -285,6 +295,7 @@ class NumpyArrays(ArrayBackend[np.ndarray[Any, np.dtype[Any]]]):
     )
     reports_device = False
 
+    @override
     def shape(self, value: np.ndarray[Any, np.dtype[Any]]) -> tuple[int, ...]:
         """The extent of every axis.
 
@@ -293,6 +304,7 @@ class NumpyArrays(ArrayBackend[np.ndarray[Any, np.dtype[Any]]]):
         """
         return value.shape
 
+    @override
     def dtype(self, value: np.ndarray[Any, np.dtype[Any]]) -> DTypeId:
         """The logical scalar format of the array.
 
@@ -311,7 +323,8 @@ class NumpyArrays(ArrayBackend[np.ndarray[Any, np.dtype[Any]]]):
                 f"NumPy dtype {name!r} has no logical scalar format"
             ) from cause
 
-    def device(self, value: np.ndarray[Any, np.dtype[Any]]) -> properties.DeviceId | None:  # noqa: ARG002  NumPy reports no placement, so it reads nothing.
+    @override
+    def device(self, value: np.ndarray[Any, np.dtype[Any]]) -> properties.DeviceId | None:
         """NumPy places no array, so it reports no placement.
 
         Returns:
@@ -319,6 +332,7 @@ class NumpyArrays(ArrayBackend[np.ndarray[Any, np.dtype[Any]]]):
         """
         return None
 
+    @override
     def native_dtype(self, value: np.ndarray[Any, np.dtype[Any]]) -> Hashable:
         """NumPy's own dtype object, which carries byte order as well as format.
 
@@ -327,6 +341,7 @@ class NumpyArrays(ArrayBackend[np.ndarray[Any, np.dtype[Any]]]):
         """
         return value.dtype
 
+    @override
     def operation_formats(self, operation: type[operations.Operation[Any]]) -> frozenset[DTypeId]:
         """Every logical format one NumPy operation accepts, from its declared domain.
 

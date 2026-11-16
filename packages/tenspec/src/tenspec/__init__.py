@@ -10,6 +10,7 @@ This is the common surface. Everything below it keeps its defining module, inclu
 `tenspec.runtime.arrays.ArrayBackend`, and `tenspec.pydantic.annotations.prepare_annotation`.
 """
 
+import importlib.metadata
 from typing import Literal as Shape
 
 from tenspec.errors import AnnotationError, ConstraintEvaluationError
@@ -20,7 +21,7 @@ from tenspec.runtime.bindings import axis_size
 from tenspec.types.dtypes import DType, Floating
 from tenspec.types.properties import Contiguous, Finite, Materialized, NonEmpty
 
-__version__ = "0.1.0"
+__version__ = importlib.metadata.version("tenspec")
 
 __all__ = [
     "AnnotationError",
