@@ -62,3 +62,6 @@ pythonpath = ["."]
 # poe tasks are defined in poe_tasks.toml (the verbose `[tool.poe.tasks.*]` form), included here.
 [tool.poe]
 include = ["poe_tasks.toml"]
+
+[tool.quality]
+source-roots = ["packages/tenspec/src/tenspec"]
