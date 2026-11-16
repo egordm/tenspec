@@ -1,5 +1,5 @@
 import pytest
-from checks.repository import SourceRoots
+from checks.repository import Repository, SourceRoots
 
 
 @pytest.mark.parametrize(
@@ -55,3 +55,14 @@ def test_matches_directory_boundary_when_testing_source_membership(
 
     # Assert
     assert contains is expected
+
+
+def test_maps_renamed_python_file_to_origin_when_git_reports_renames() -> None:
+    # Arrange
+    name_status = "R097\0library/old.py\0library/new.py\0R100\0donor.txt\0library/gained.py\0"
+
+    # Act
+    renamed = Repository.renames(name_status, (".py", ".pyi"))
+
+    # Assert
+    assert renamed == {"library/new.py": "library/old.py"}

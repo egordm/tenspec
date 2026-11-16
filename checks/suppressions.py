@@ -18,11 +18,16 @@ class SuppressionCheck:
     )
 
     def __init__(
-        self, base: dict[str, str], branch: dict[str, str], changed: set[str] | None = None
+        self,
+        base: dict[str, str],
+        branch: dict[str, str],
+        changed: set[str] | None = None,
+        renamed: dict[str, str] | None = None,
     ) -> None:
         self.base = base
         self.branch = branch
         self.changed = set(branch) if changed is None else changed
+        self.renamed = renamed or {}
 
     def findings(self) -> list[Finding]:
         if not self.branch:
@@ -31,7 +36,7 @@ class SuppressionCheck:
         for path, text in self.branch.items():
             if path not in self.changed:
                 continue
-            added = self.added_rows(self.base.get(path, ""), text)
+            added = self.added_rows(self.base.get(self.renamed.get(path, path), ""), text)
             findings.extend(
                 Finding(path, token.start[0], "suppression", "new suppression is forbidden")
                 for token in tokenize.generate_tokens(io.StringIO(text).readline)
@@ -60,10 +65,10 @@ def main(arguments: list[str] | None = None) -> int:
     branch = repository.texts((".py", ".pyi"))
     changed = repository.changed_paths()
     paths = repository.base_paths()
-    base = {
-        path: repository.base_text(path) for path in branch if path in paths and path in changed
-    }
-    return report(SuppressionCheck(base, branch, changed).findings())
+    renamed = repository.renamed_paths((".py", ".pyi"))
+    origins = {renamed.get(path, path) for path in branch if path in changed}
+    base = {path: repository.base_text(path) for path in origins if path in paths}
+    return report(SuppressionCheck(base, branch, changed, renamed).findings())
 
 
 if __name__ == "__main__":
