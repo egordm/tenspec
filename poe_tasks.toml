@@ -4,23 +4,23 @@
 
 [tool.poe.tasks.lint]
 help = "Lint all packages with ruff"
-cmd = "ruff check packages docs"
+cmd = "ruff check packages docs checks tests"
 
 [tool.poe.tasks.lint-fix]
 help = "Lint all packages and apply ruff's safe fixes"
-cmd = "ruff check --fix packages docs"
+cmd = "ruff check --fix packages docs checks tests"
 
 [tool.poe.tasks.format]
 help = "Format all packages with ruff"
-cmd = "ruff format packages docs"
+cmd = "ruff format packages docs checks tests"
 
 [tool.poe.tasks.format-check]
 help = "Check formatting across all packages without writing"
-cmd = "ruff format --check packages docs"
+cmd = "ruff format --check packages docs checks tests"
 
 [tool.poe.tasks.typecheck]
 help = "Type-check all packages with ty"
-cmd = "ty check packages docs"
+cmd = "ty check packages docs checks tests"
 
 [tool.poe.tasks.test]
 help = "Run the test suite, the caller-compatibility integration tests included"
@@ -31,14 +31,36 @@ cmd = "pytest"
 # split of a larger workspace. Both run the whole suite, so both read the caller fixture with ty,
 # Pyright and Pyrefly. There is no separate checker command and no separate environment.
 [tool.poe.tasks.check]
-help = "Fast iteration gate: lint, format-check, typecheck, test. Run freely while building."
-sequence = ["lint", "format-check", "typecheck", "test"]
+help = "Fast iteration gate: lint, format-check, typecheck, quality, test. Run freely while building."
+sequence = ["lint", "format-check", "typecheck", "quality", "test"]
 default_item_type = "ref"
 
 [tool.poe.tasks.check-full]
 help = "Commit + CI gate: same as check for a single-package project; add integration tests as they land."
-sequence = ["lint", "format-check", "typecheck", "test"]
+sequence = ["lint", "format-check", "typecheck", "quality", "test"]
 default_item_type = "ref"
+
+[tool.poe.tasks.quality-inventory]
+cmd = "python -m checks.inventory"
+
+[tool.poe.tasks.quality-suppressions]
+cmd = "python -m checks.suppressions"
+
+[tool.poe.tasks.quality-budgets]
+cmd = "python -m checks.budgets"
+
+[tool.poe.tasks.quality-growth]
+cmd = "python -m checks.growth"
+
+[tool.poe.tasks.quality-configuration]
+cmd = "python -m checks.configuration"
+
+[tool.poe.tasks.quality-vocabulary]
+cmd = "python -m checks.vocabulary"
+
+[tool.poe.tasks.quality]
+help = "Check suppressions, budgets, function growth, configuration and vocabulary; accepts --base REF"
+cmd = "python -m checks"
 
 # The documentation site. Run it as `uv run --only-group docs poe docs`: that group alone holds
 # the build, so the checkers and Torch stay out of it. `-W` turns every Sphinx warning into an
