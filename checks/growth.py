@@ -27,9 +27,12 @@ class GrowthCheck:
         self,
         base: dict[tuple[str, str, int], Measurement],
         branch: dict[tuple[str, str, int], Measurement],
+        *,
+        renamed: dict[str, str] | None = None,
     ) -> None:
         self.base = base
         self.branch = branch
+        self.renamed = renamed or {}
 
     def findings(self) -> list[Finding]:
         if not self.branch:
@@ -37,7 +40,7 @@ class GrowthCheck:
         findings = []
         for identity, current in self.branch.items():
             path, name, occurrence = identity
-            previous = self.base.get(identity)
+            previous = self.base.get((self.renamed.get(path, path), name, occurrence))
             label = f"{name} occurrence {occurrence + 1}"
             if previous is None or not previous.excess():
                 findings.extend(
@@ -59,17 +62,24 @@ class GrowthCheck:
 
 class StructureGrowth:
     def __init__(
-        self, base: dict[str, str], branch: dict[str, str], source_roots: SourceRoots
+        self,
+        base: dict[str, str],
+        branch: dict[str, str],
+        source_roots: SourceRoots,
+        *,
+        renamed: dict[str, str] | None = None,
     ) -> None:
         self.base = {path: text for path, text in base.items() if source_roots.contains(path)}
         self.branch = {path: text for path, text in branch.items() if source_roots.contains(path)}
+        self.renamed = renamed or {}
 
     def findings(self) -> list[Finding]:
         if not self.branch:
             return [Finding.empty("structure-growth")]
         findings = []
         for path, text in self.branch.items():
-            current, previous = len(text.splitlines()), len(self.base.get(path, "").splitlines())
+            origin = self.base.get(self.renamed.get(path, path), "")
+            current, previous = len(text.splitlines()), len(origin.splitlines())
             if current > max(500, previous):
                 findings.append(
                     Finding(
@@ -152,10 +162,13 @@ def main(arguments: list[str] | None = None) -> int:
     branch = measurements(
         branch_texts, Ruff(repository.root, list(branch_texts)).complexity(), repository.root
     )
+    renamed = repository.renamed_paths((".py", ".pyi"))
     return report(
         [
-            *GrowthCheck(base, branch).findings(),
-            *StructureGrowth(base_texts, branch_texts, repository.source_roots).findings(),
+            *GrowthCheck(base, branch, renamed=renamed).findings(),
+            *StructureGrowth(
+                base_texts, branch_texts, repository.source_roots, renamed=renamed
+            ).findings(),
         ]
     )
 

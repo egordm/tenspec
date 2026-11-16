@@ -8,6 +8,7 @@ import tomllib
 from collections.abc import Generator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
+from itertools import batched
 from pathlib import Path, PurePosixPath
 from tempfile import TemporaryDirectory
 from typing import Self, override
@@ -135,6 +136,33 @@ class Repository:
     def changed_paths(self) -> set[str]:
         output = command(["git", "diff", "--name-only", "-z", self.base, "--"], cwd=self.root)
         return set(output.strip("\0").split("\0")) - {""}
+
+    def renamed_paths(self, suffixes: tuple[str, ...]) -> dict[str, str]:
+        """Find the files Git reads as renamed since the base.
+
+        A renamed file keeps the allowances of its origin and no others: its comments and
+        functions are compared with the origin's, exactly as if it had been edited in place.
+
+        Returns:
+            Each renamed path mapped to the base path it came from.
+        """
+        arguments = ["git", "diff", "--name-status", "-z", "--find-renames", "--diff-filter=R"]
+        output = command([*arguments, self.base, "--"], cwd=self.root)
+        return self.renames(output, suffixes)
+
+    @staticmethod
+    def renames(name_status: str, suffixes: tuple[str, ...]) -> dict[str, str]:
+        """Read rename records, keeping those whose origin was a checked file too.
+
+        Returns:
+            Each renamed path mapped to its origin, when both carry one of the suffixes.
+        """
+        fields = [field for field in name_status.split("\0") if field]
+        return {
+            current: origin
+            for _, origin, current in batched(fields, 3, strict=True)
+            if origin.endswith(suffixes) and current.endswith(suffixes)
+        }
 
     @contextmanager
     def base_tree(self) -> Generator[Path]:

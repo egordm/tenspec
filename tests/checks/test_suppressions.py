@@ -101,3 +101,28 @@ def test_reports_empty_subject_when_no_python_files_are_read() -> None:
 
     # Assert
     assert findings[0].rule == "empty-subject"
+
+
+def test_passes_when_file_with_existing_comment_is_renamed() -> None:
+    # Arrange
+    text = "def calculate():  # " + "noqa: C901\n    return 1\n"
+    before = {"old.py": text}
+    after = {"new.py": "import other\n" + text}
+
+    # Act
+    findings = SuppressionCheck(before, after, renamed={"new.py": "old.py"}).findings()
+
+    # Assert
+    assert findings == []
+
+
+def test_reports_suppression_when_renamed_file_gains_comment() -> None:
+    # Arrange
+    before = {"old.py": "value = 1\nother = 2\n"}
+    after = {"new.py": "value = 1\nother = 2  # " + "noqa: E501\n"}
+
+    # Act
+    findings = SuppressionCheck(before, after, renamed={"new.py": "old.py"}).findings()
+
+    # Assert
+    assert [(item.path, item.line) for item in findings] == [("new.py", 2)]

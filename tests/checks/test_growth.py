@@ -366,3 +366,57 @@ def test_reports_empty_subject_when_no_configured_source_is_read(source_roots: S
 
     # Assert
     assert [item.rule for item in findings] == ["empty-subject"]
+
+
+def test_passes_when_over_limit_function_keeps_its_size_in_renamed_file() -> None:
+    # Arrange
+    base = {("old.py", "calculate", 0): Measurement(1, 53, {"PLR0913": 7})}
+    branch = {("new.py", "calculate", 0): Measurement(4, 53, {"PLR0913": 7})}
+
+    # Act
+    findings = GrowthCheck(base, branch, renamed={"new.py": "old.py"}).findings()
+
+    # Assert
+    assert findings == []
+
+
+def test_reports_growth_when_over_limit_function_grows_in_renamed_file() -> None:
+    # Arrange
+    base = {("old.py", "calculate", 0): Measurement(1, 53, {"PLR0913": 7})}
+    branch = {("new.py", "calculate", 0): Measurement(1, 53, {"PLR0913": 8})}
+
+    # Act
+    findings = GrowthCheck(base, branch, renamed={"new.py": "old.py"}).findings()
+
+    # Assert
+    assert [(item.path, item.rule) for item in findings] == [("new.py", "PLR0913")]
+
+
+def test_passes_when_large_module_keeps_its_length_in_renamed_file(
+    source_roots: SourceRoots,
+) -> None:
+    # Arrange
+    base: dict[str, str] = {"library/old.py": "value = 1\n" * 600}
+    branch: dict[str, str] = {"library/new.py": "value = 1\n" * 600}
+    renamed = {"library/new.py": "library/old.py"}
+
+    # Act
+    findings = StructureGrowth(base, branch, source_roots, renamed=renamed).findings()
+
+    # Assert
+    assert findings == []
+
+
+def test_reports_module_growth_when_large_module_grows_in_renamed_file(
+    source_roots: SourceRoots,
+) -> None:
+    # Arrange
+    base: dict[str, str] = {"library/old.py": "value = 1\n" * 600}
+    branch: dict[str, str] = {"library/new.py": "value = 1\n" * 601}
+    renamed = {"library/new.py": "library/old.py"}
+
+    # Act
+    findings = StructureGrowth(base, branch, source_roots, renamed=renamed).findings()
+
+    # Assert
+    assert [item.message for item in findings] == ["module grew to 601 lines from 600"]
