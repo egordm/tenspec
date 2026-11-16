@@ -508,3 +508,69 @@ def test_passes_when_layer_entry_tracks_module_existence(change: str) -> None:
 
     # Assert
     assert findings == []
+
+
+def declared_ahead(members: str) -> dict[str, bytes]:
+    contract = (
+        "[importlinter]\nroot_package = library\n"
+        "[importlinter:contract:family]\nname = Family\ntype = independence\n"
+        f"modules =\n{members}"
+        "[importlinter:contract:boundary]\nname = Boundary\ntype = forbidden\n"
+        "source_modules =\n    library.family.**\n    library.stable\n"
+        "forbidden_modules =\n    library.old\n"
+    )
+    return {
+        "pyproject.toml": b'[tool.quality]\nsource-roots = ["library"]\n',
+        ".importlinter": contract.encode(),
+        "library/__init__.py": b"",
+        "library/old/__init__.py": b"",
+        "library/old/child.py": b"",
+        "library/stable.py": b"",
+    }
+
+
+def test_passes_when_entry_declared_ahead_is_unchanged_as_its_package_appears() -> None:
+    # Arrange
+    base = declared_ahead("    library.family.*\n")
+    branch = {
+        path.replace("library/old/", "library/family/part/"): data
+        for path, data in base.items()
+        if path != ".importlinter"
+    }
+    branch["library/family/__init__.py"] = b""
+    branch[".importlinter"] = (
+        base[".importlinter"].decode().replace("library.old", "library.family.part").encode()
+    )
+
+    # Act
+    findings = ConfigurationCheck(base, branch).findings()
+
+    # Assert
+    assert findings == []
+
+
+@pytest.mark.parametrize("entry", ["    library.family.*\n", "    library.family.**\n"])
+def test_reports_mixed_change_when_entry_declared_ahead_is_dropped_as_its_package_appears(
+    entry: str,
+) -> None:
+    # Arrange
+    base = declared_ahead("    library.family.*\n")
+    branch = {
+        path.replace("library/old/", "library/family/part/"): data
+        for path, data in base.items()
+        if path != ".importlinter"
+    }
+    branch["library/family/__init__.py"] = b""
+    branch[".importlinter"] = (
+        base[".importlinter"]
+        .decode()
+        .replace("library.old", "library.family.part")
+        .replace(entry, "", 1)
+        .encode()
+    )
+
+    # Act
+    findings = ConfigurationCheck(base, branch).findings()
+
+    # Assert
+    assert [item.path for item in findings] == [".importlinter"]
