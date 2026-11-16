@@ -21,8 +21,8 @@ from checks.suppressions import SuppressionCheck
 )
 def test_reports_suppression_when_comment_is_added(directive: str) -> None:
     # Arrange
-    before = {"src/example.py": "value = 1\n"}
-    after = {"src/example.py": f"value = 1  # {directive}\n"}
+    before = {"library/example.py": "value = 1\n"}
+    after = {"library/example.py": f"value = 1  # {directive}\n"}
 
     # Act
     findings = SuppressionCheck(before, after).findings()

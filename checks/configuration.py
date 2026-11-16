@@ -20,7 +20,7 @@ class ConfigurationCheck:
             "quality-budget.toml",
         }
     )
-    tables = ("ruff", "ty", "pytest", "poe", "importlinter")
+    tables = ("ruff", "ty", "pytest", "poe", "importlinter", "quality")
 
     def __init__(self, base: dict[str, bytes], branch: dict[str, bytes]) -> None:
         self.base = base

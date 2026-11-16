@@ -1,5 +1,6 @@
 import pytest
 from checks.budgets import BudgetCheck, structure_counts
+from checks.repository import SourceRoots
 from checks.ruff import Ruff
 
 
@@ -59,15 +60,15 @@ def test_reports_new_budget_when_positive_row_is_added_after_introduction() -> N
     assert len(findings) == 1
 
 
-def test_counts_structure_when_boundaries_are_exceeded() -> None:
+def test_counts_structure_when_boundaries_are_exceeded(source_roots: SourceRoots) -> None:
     # Arrange
     dense = "def calculate():\n" + "    value = 1\n" * 81
-    files = {f"packages/tenspec/src/tenspec/domain/module{number}.py": "" for number in range(11)}
-    files["packages/tenspec/src/tenspec/domain/large.py"] = dense + "\n" * 420
-    files["packages/tenspec/src/tenspec/domain/__init__.py"] = ""
+    files = {f"library/domain/module{number}.py": "" for number in range(11)}
+    files["library/domain/large.py"] = dense + "\n" * 420
+    files["library/domain/__init__.py"] = ""
 
     # Act
-    counts = structure_counts(files)
+    counts = structure_counts(files, source_roots)
 
     # Assert
     assert counts == {
@@ -78,7 +79,7 @@ def test_counts_structure_when_boundaries_are_exceeded() -> None:
     }
 
 
-def test_excludes_nested_body_when_measuring_parent() -> None:
+def test_excludes_nested_body_when_measuring_parent(source_roots: SourceRoots) -> None:
     # Arrange
     source = (
         'def parent():\n    """Explain.\n\n    More.\n    """\n    def child():\n'
@@ -87,7 +88,7 @@ def test_excludes_nested_body_when_measuring_parent() -> None:
     )
 
     # Act
-    counts = structure_counts({"packages/tenspec/src/tenspec/domain.py": source})
+    counts = structure_counts({"library/domain.py": source}, source_roots)
 
     # Assert
     assert counts["structure.long-functions"] == 1
@@ -103,7 +104,9 @@ def test_reports_error_when_ruff_statistics_output_is_empty() -> None:
         Ruff.parse_diagnostics(output)
 
 
-def test_preserves_string_lines_when_comment_marker_is_inside_literal() -> None:
+def test_preserves_string_lines_when_comment_marker_is_inside_literal(
+    source_roots: SourceRoots,
+) -> None:
     # Arrange
     source = (
         'def render():\n    value = """first\n'
@@ -112,7 +115,7 @@ def test_preserves_string_lines_when_comment_marker_is_inside_literal() -> None:
     )
 
     # Act
-    counts = structure_counts({"packages/tenspec/src/tenspec/render.py": source})
+    counts = structure_counts({"library/render.py": source}, source_roots)
 
     # Assert
     assert counts["structure.dense-functions"] == 1
@@ -141,16 +144,16 @@ def test_reports_empty_subject_when_budget_measurements_are_empty() -> None:
     assert findings[0].rule == "empty-subject"
 
 
-def test_reports_error_when_structure_inventory_is_empty() -> None:
+def test_reports_error_when_structure_inventory_is_empty(source_roots: SourceRoots) -> None:
     # Arrange
     texts: dict[str, str] = {}
 
     # Act & Assert
     with pytest.raises(ValueError, match="must not be empty"):
-        structure_counts(texts)
+        structure_counts(texts, source_roots)
 
 
-def test_resets_run_when_nested_definition_separates_regions() -> None:
+def test_resets_run_when_nested_definition_separates_regions(source_roots: SourceRoots) -> None:
     # Arrange
     source = (
         "def parent():\n"
@@ -160,7 +163,68 @@ def test_resets_run_when_nested_definition_separates_regions() -> None:
     )
 
     # Act
-    counts = structure_counts({"packages/tenspec/src/tenspec/example.py": source})
+    counts = structure_counts({"library/example.py": source}, source_roots)
 
     # Assert
     assert counts["structure.dense-functions"] == 0
+
+
+@pytest.mark.parametrize("path", ["library/grown.py", "outside/grown.py"])
+def test_reports_function_budget_when_grown_function_is_under_configured_root(
+    path: str, source_roots: SourceRoots
+) -> None:
+    # Arrange
+    source = "def calculate():\n" + "    value = 1\n" * 80
+    files = {"library/anchor.py": "", path: source + "    value = 2\n"}
+    check = BudgetCheck(
+        None,
+        "[structure]\nlong-functions = 0\ndense-functions = 0\n"
+        "long-modules = 0\nwide-directories = 0\n",
+    )
+
+    # Act
+    findings = check.findings(structure_counts(files, source_roots))
+
+    # Assert
+    expected = (
+        {"structure.long-functions", "structure.dense-functions"}
+        if path.startswith("library/")
+        else set()
+    )
+    assert {item.rule for item in findings} == expected
+
+
+def test_counts_both_roots_when_each_has_over_limit_function() -> None:
+    # Arrange
+    roots = SourceRoots.from_project(
+        '[tool.quality]\nsource-roots = ["library/one", "library/two"]\n'
+    )
+    source = "def calculate():\n" + "    value = 1\n" * 81
+    files = {"library/one/module.py": source, "library/two/module.py": source}
+
+    # Act
+    counts = structure_counts(files, roots)
+
+    # Assert
+    assert counts["structure.long-functions"] == 2
+    assert counts["structure.dense-functions"] == 2
+
+
+def test_reports_error_when_budget_file_contains_noninteger_setting() -> None:
+    # Arrange
+    text = '[tool.quality]\nsource-roots = ["library"]\n[structure]\nlong-modules = 0\n'
+
+    # Act & Assert
+    with pytest.raises(ValueError, match="must be a nonnegative integer"):
+        BudgetCheck.parse(text)
+
+
+def test_reports_error_when_only_outside_structure_files_are_read(
+    source_roots: SourceRoots,
+) -> None:
+    # Arrange
+    texts = {"outside/module.py": "value = 1\n"}
+
+    # Act & Assert
+    with pytest.raises(ValueError, match="Structure source inventory must not be empty"):
+        structure_counts(texts, source_roots)

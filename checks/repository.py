@@ -4,12 +4,13 @@ import argparse
 import subprocess
 import sys
 import tarfile
-from collections.abc import Iterator, Sequence
+import tomllib
+from collections.abc import Generator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from tempfile import TemporaryDirectory
-from typing import Self
+from typing import Self, override
 
 
 @dataclass(frozen=True)
@@ -23,8 +24,38 @@ class Finding:
     def empty(cls, subject: str) -> Self:
         return cls(subject, 1, "empty-subject", "no files or measurements were examined")
 
+    @override
     def __str__(self) -> str:
         return f"{self.path}:{self.line}: {self.rule}: {self.message}"
+
+
+@dataclass(frozen=True)
+class SourceRoots:
+    paths: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        if not self.paths or any(
+            not (path := PurePosixPath(root)).parts or path.is_absolute() or ".." in path.parts
+            for root in self.paths
+        ):
+            raise ValueError(
+                "tool.quality.source-roots must be a nonempty list of "
+                "repository-relative directories; "
+                'write [tool.quality] with source-roots = ["library"] in pyproject.toml'
+            )
+
+    @classmethod
+    def from_project(cls, text: str) -> Self:
+        tools = tomllib.loads(text).get("tool", {})
+        quality = tools.get("quality") if isinstance(tools, dict) else None
+        roots = quality.get("source-roots") if isinstance(quality, dict) else None
+        if not isinstance(roots, list) or not all(isinstance(root, str) for root in roots):
+            return cls(())
+        return cls(tuple(roots))
+
+    def contains(self, path: str) -> bool:
+        candidate = PurePosixPath(path)
+        return any(candidate.is_relative_to(root) for root in self.paths)
 
 
 def command(arguments: Sequence[str], *, cwd: Path, accepts_findings: bool = False) -> str:
@@ -48,7 +79,7 @@ class Repository:
         self.root = Path(command(["git", "rev-parse", "--show-toplevel"], cwd=Path.cwd()).strip())
         self.base = command(
             ["git", "rev-parse", "--verify", "--end-of-options", base]
-            if base
+            if bool(base)
             else ["git", "merge-base", "HEAD", "origin/main"],
             cwd=self.root,
         ).strip()
@@ -56,6 +87,7 @@ class Repository:
             raise RuntimeError(
                 "Cannot resolve comparison base; fetch origin/main or pass --base REF"
             )
+        self.source_roots = SourceRoots.from_project((self.root / "pyproject.toml").read_text())
 
     def paths(self) -> list[str]:
         output = command(["git", "ls-files", "-z"], cwd=self.root)
@@ -105,7 +137,7 @@ class Repository:
         return set(output.strip("\0").split("\0")) - {""}
 
     @contextmanager
-    def base_tree(self) -> Iterator[Path]:
+    def base_tree(self) -> Generator[Path]:
         with TemporaryDirectory(prefix="quality-base-") as directory:
             root = Path(directory).resolve()
             archive = root / "tree.tar"

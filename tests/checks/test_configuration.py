@@ -11,7 +11,7 @@ from checks.configuration import ConfigurationCheck
         "quality-budget.toml",
         "ruff.toml",
         "nested/ruff.toml",
-        "src/ruff.toml",
+        "library/ruff.toml",
         "ty.toml",
         "nested/ty.toml",
         ".importlinter",
@@ -23,7 +23,7 @@ from checks.configuration import ConfigurationCheck
 )
 def test_reports_mixed_change_when_enforcement_file_is_added(path: str) -> None:
     # Arrange
-    branch = {path: b"", "src/example.py": b"value = 2\n"}
+    branch = {path: b"", "library/example.py": b"value = 2\n"}
 
     # Act
     findings = ConfigurationCheck({}, branch).findings()
@@ -46,8 +46,8 @@ def test_passes_when_enforcement_changes_stand_alone() -> None:
 
 def test_passes_when_non_enforcement_files_change_together() -> None:
     # Arrange
-    base = {"src/example.py": b"value = 1\n"}
-    branch = {"src/example.py": b"value = 2\n", "docs/example.md": b"Explain the value.\n"}
+    base = {"library/example.py": b"value = 1\n"}
+    branch = {"library/example.py": b"value = 2\n", "docs/example.md": b"Explain the value.\n"}
 
     # Act
     findings = ConfigurationCheck(base, branch).findings()
@@ -58,8 +58,8 @@ def test_passes_when_non_enforcement_files_change_together() -> None:
 
 def test_reports_mixed_change_when_existing_enforcement_bytes_differ() -> None:
     # Arrange
-    base = {"ruff.toml": b"# Policy\n", "src/example.py": b"value = 1\n"}
-    branch = {"ruff.toml": b"# Updated policy\n", "src/example.py": b"value = 2\n"}
+    base = {"ruff.toml": b"# Policy\n", "library/example.py": b"value = 1\n"}
+    branch = {"ruff.toml": b"# Updated policy\n", "library/example.py": b"value = 2\n"}
 
     # Act
     findings = ConfigurationCheck(base, branch).findings()
@@ -68,13 +68,13 @@ def test_reports_mixed_change_when_existing_enforcement_bytes_differ() -> None:
     assert [item.path for item in findings] == ["ruff.toml"]
 
 
-@pytest.mark.parametrize("table", ["ruff", "ty", "pytest", "poe", "importlinter"])
+@pytest.mark.parametrize("table", ["ruff", "ty", "pytest", "poe", "importlinter", "quality"])
 def test_reports_mixed_change_when_protected_project_table_changes(table: str) -> None:
     # Arrange
     before = f"[tool.{table}]\nsetting = 'old'\n".encode()
     after = f"[tool.{table}]\nsetting = 'new'\n".encode()
-    base = {"pyproject.toml": before, "src/example.py": b"value = 1\n"}
-    branch = {"pyproject.toml": after, "src/example.py": b"value = 2\n"}
+    base = {"pyproject.toml": before, "library/example.py": b"value = 1\n"}
+    branch = {"pyproject.toml": after, "library/example.py": b"value = 2\n"}
 
     # Act
     findings = ConfigurationCheck(base, branch).findings()
@@ -88,7 +88,7 @@ def test_passes_when_budget_falls_alongside_code() -> None:
     base = {"quality-budget.toml": b"[structure]\nlong-modules = 2\n"}
     branch = {
         "quality-budget.toml": b"[structure]\nlong-modules = 1\n",
-        "src/example.py": b"value = 2\n",
+        "library/example.py": b"value = 2\n",
     }
 
     # Act
@@ -103,7 +103,7 @@ def test_reports_mixed_change_when_budget_rises_alongside_code() -> None:
     base = {"quality-budget.toml": b"[structure]\nlong-modules = 2\n"}
     branch = {
         "quality-budget.toml": b"[structure]\nlong-modules = 3\n",
-        "src/example.py": b"value = 2\n",
+        "library/example.py": b"value = 2\n",
     }
 
     # Act
@@ -121,7 +121,7 @@ def test_passes_when_testpaths_gain_entry_alongside_code() -> None:
     branch = {
         "pyproject.toml": b"[tool.pytest.ini_options]\ntestpaths = ['tests', 'examples']\n"
         b"addopts = '-ra'\n",
-        "src/example.py": b"value = 2\n",
+        "library/example.py": b"value = 2\n",
     }
 
     # Act
@@ -136,7 +136,7 @@ def test_reports_mixed_change_when_testpaths_lose_entry() -> None:
     base = {"pyproject.toml": b"[tool.pytest.ini_options]\ntestpaths = ['tests', 'examples']\n"}
     branch = {
         "pyproject.toml": b"[tool.pytest.ini_options]\ntestpaths = ['examples']\n",
-        "src/example.py": b"value = 2\n",
+        "library/example.py": b"value = 2\n",
     }
 
     # Act
@@ -175,7 +175,65 @@ def test_passes_when_first_testpath_table_is_added_with_code() -> None:
     branch = {
         "pyproject.toml": base["pyproject.toml"]
         + b"[tool.pytest.ini_options]\ntestpaths = ['tests']\n",
-        "src/example.py": b"value = 2\n",
+        "library/example.py": b"value = 2\n",
+    }
+
+    # Act
+    findings = ConfigurationCheck(base, branch).findings()
+
+    # Assert
+    assert findings == []
+
+
+@pytest.mark.parametrize(
+    ("before", "after"),
+    [
+        ("", '[tool.quality]\nsource-roots = ["library"]\n'),
+        (
+            '[tool.quality]\nsource-roots = ["library"]\n',
+            '[tool.quality]\nsource-roots = ["other"]\n',
+        ),
+        ('[tool.quality]\nsource-roots = ["library"]\n', ""),
+    ],
+)
+def test_reports_mixed_change_when_source_roots_change_with_code(before: str, after: str) -> None:
+    # Arrange
+    base = {"pyproject.toml": before.encode()}
+    branch = {"pyproject.toml": after.encode(), "library/module.py": b"value = 1\n"}
+
+    # Act
+    findings = ConfigurationCheck(base, branch).findings()
+
+    # Assert
+    assert [item.path for item in findings] == ["pyproject.toml"]
+
+
+def test_passes_when_budget_falls_with_unchanged_source_roots() -> None:
+    # Arrange
+    source = '[tool.quality]\nsource-roots = ["library"]\n'
+    base = {
+        "pyproject.toml": source.encode(),
+        "quality-budget.toml": b"[structure]\nlong-modules = 2\n",
+    }
+    branch = {
+        "pyproject.toml": source.encode(),
+        "quality-budget.toml": b"[structure]\nlong-modules = 1\n",
+        "library/module.py": b"value = 1\n",
+    }
+
+    # Act
+    findings = ConfigurationCheck(base, branch).findings()
+
+    # Assert
+    assert findings == []
+
+
+def test_passes_when_source_settings_change_with_enforcement_files() -> None:
+    # Arrange
+    base = {"pyproject.toml": b"[project]\nname = 'example'\n", "checks/owner.py": b"old\n"}
+    branch = {
+        "pyproject.toml": base["pyproject.toml"] + b'[tool.quality]\nsource-roots = ["library"]\n',
+        "checks/owner.py": b"new\n",
     }
 
     # Act

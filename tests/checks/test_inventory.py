@@ -4,7 +4,7 @@ from checks.inventory import InventoryCheck
 
 def test_passes_when_tracked_paths_are_checked_source_and_documents() -> None:
     # Arrange
-    check = InventoryCheck(["src/skllm/module.py", "docs/guide.md", "tests/test_module.py"], [])
+    check = InventoryCheck(["library/module.py", "docs/guide.md", "tests/test_module.py"], [])
 
     # Act
     findings = check.findings()

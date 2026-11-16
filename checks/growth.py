@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, ClassVar
 
-from checks.repository import Finding, Repository, comparison_parser, report
+from checks.repository import Finding, Repository, SourceRoots, comparison_parser, report
 from checks.ruff import Ruff
 from checks.source import PythonSource
 
@@ -58,17 +58,17 @@ class GrowthCheck:
 
 
 class StructureGrowth:
-    def __init__(self, base: dict[str, str], branch: dict[str, str]) -> None:
-        self.base = base
-        self.branch = branch
+    def __init__(
+        self, base: dict[str, str], branch: dict[str, str], source_roots: SourceRoots
+    ) -> None:
+        self.base = {path: text for path, text in base.items() if source_roots.contains(path)}
+        self.branch = {path: text for path, text in branch.items() if source_roots.contains(path)}
 
     def findings(self) -> list[Finding]:
         if not self.branch:
             return [Finding.empty("structure-growth")]
         findings = []
         for path, text in self.branch.items():
-            if not path.startswith("packages/tenspec/src/tenspec/"):
-                continue
             current, previous = len(text.splitlines()), len(self.base.get(path, "").splitlines())
             if current > max(500, previous):
                 findings.append(
@@ -94,8 +94,6 @@ class StructureGrowth:
     def directory_counts(texts: dict[str, str]) -> dict[str, int]:
         directories: dict[str, set[str]] = defaultdict(set)
         for name in texts:
-            if not name.startswith("packages/tenspec/src/tenspec/"):
-                continue
             path = Path(name)
             if path.stem != "__init__":
                 directories[str(path.parent)].add(path.stem)
@@ -157,7 +155,7 @@ def main(arguments: list[str] | None = None) -> int:
     return report(
         [
             *GrowthCheck(base, branch).findings(),
-            *StructureGrowth(base_texts, branch_texts).findings(),
+            *StructureGrowth(base_texts, branch_texts, repository.source_roots).findings(),
         ]
     )
 

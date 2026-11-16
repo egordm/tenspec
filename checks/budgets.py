@@ -5,7 +5,7 @@ from collections import Counter
 from pathlib import Path
 from typing import Self
 
-from checks.repository import Finding, Repository, comparison_parser, report
+from checks.repository import Finding, Repository, SourceRoots, comparison_parser, report
 from checks.ruff import Ruff
 from checks.source import PythonSource
 
@@ -70,11 +70,11 @@ class BudgetCheck:
         return findings
 
 
-def structure_counts(texts: dict[str, str]) -> dict[str, int]:
+def structure_counts(texts: dict[str, str], source_roots: SourceRoots) -> dict[str, int]:
     population = {
         path: text
         for path, text in texts.items()
-        if path.startswith("packages/tenspec/src/tenspec/") and path.endswith(".py")
+        if source_roots.contains(path) and path.endswith(".py")
     }
     if not population:
         raise ValueError("Structure source inventory must not be empty")
@@ -103,7 +103,7 @@ def measure(repository: Repository) -> dict[str, int]:
             f"suppressed.{code}": count
             for code, count in Ruff(repository.root, list(texts)).suppressed_counts().items()
         },
-        **structure_counts(texts),
+        **structure_counts(texts, repository.source_roots),
     }
 
 
